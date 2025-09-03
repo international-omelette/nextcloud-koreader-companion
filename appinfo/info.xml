@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<info>
+  <id>koreader_companion</id>
+  <name>KOReader Companion</name>
+  <summary>OPDS library and KOReader sync for Nextcloud</summary>
+  <description>Transform your Nextcloud into an authenticated OPDS ebook library with full KOReader sync support. Access your ebooks from any OPDS-compatible reader and keep your reading progress synchronized across devices.</description>
+  <version>1.0.17</version>
+  <licence>AGPL-3.0-or-later</licence>
+  <author>Dominik Fischer</author>
+  <namespace>KoreaderCompanion</namespace>
+  <category>files</category>
+  <bugs>https://github.com/international-omelette/nextcloud-koreader-companion/issues</bugs>
+  <repository type="git">https://github.com/international-omelette/nextcloud-koreader-companion.git</repository>
+  <dependencies>
+    <nextcloud min-version="25" max-version="31" />
+  </dependencies>
+  <settings>
+    <admin>OCA\KoreaderCompanion\Settings\AdminSettings</admin>
+  </settings>
+  <navigations>
+    <navigation>
+      <name>KOReader</name>
+      <route>koreader_companion.page.index</route>
+      <icon>app.svg</icon>
+    </navigation>
+  </navigations>
+</info>

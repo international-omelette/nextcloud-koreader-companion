@@ -1,0 +1,1620 @@
+/* Nextcloud CSS Layout Fix - Known issue since v25+ */
+#content {
+    height: 100% !important;
+    overflow-y: auto !important;
+}
+
+/* App container - follows Nextcloud patterns */
+#app {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    height: auto;
+    overflow: visible;
+}
+
+.ebooks-header {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.ebooks-header h1 {
+    font-size: 2.5em;
+    font-weight: 300;
+    margin: 0 0 10px 0;
+    color: var(--color-main-text);
+}
+
+.ebooks-subtitle {
+    color: var(--color-text-maxcontrast);
+    font-size: 1.1em;
+    margin: 0;
+}
+
+/* Upload Area Styles */
+.ebooks-upload-area {
+    margin: 30px 0;
+}
+
+.upload-drop-zone {
+    border: 2px dashed var(--color-border);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    background: var(--color-main-background);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-drop-zone:hover,
+.upload-drop-zone.dragover {
+    border-color: var(--color-primary);
+    background: var(--color-background-hover);
+}
+
+.upload-icon {
+    font-size: 3em;
+    margin-bottom: 16px;
+    opacity: 0.7;
+}
+
+.upload-drop-zone h3 {
+    margin: 0 0 8px 0;
+    color: var(--color-main-text);
+    font-size: 1.3em;
+}
+
+.upload-drop-zone p {
+    color: var(--color-text-maxcontrast);
+    margin: 0 0 20px 0;
+}
+
+.upload-drop-zone .btn {
+    margin-top: 12px;
+}
+
+.ebooks-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--color-text-maxcontrast);
+}
+
+.ebooks-empty .icon-book {
+    width: 64px;
+    height: 64px;
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJjdXJyZW50Q29sb3IiPjxwYXRoIGQ9Ik0xOCAySDZjLTEuMSAwLTIgLjktMiAydjE2YzAgMS4xLjkgMiAyIDJoMTJjMS4xIDAgMi0uOSAyLTJWNGMwLTEuMS0uOS0yLTItMnpNNiA0aDV2OGwtMi41LTEuNUw2IDEyVjR6Ii8+PC9zdmc+');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin: 0 auto 20px;
+    opacity: 0.3;
+}
+
+.ebooks-empty h2 {
+    font-size: 1.5em;
+    font-weight: 300;
+    margin: 0 0 10px 0;
+}
+
+/* Search Bar Styles */
+.ebooks-search-container {
+    margin: 20px 0;
+}
+
+.search-wrapper {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 45px 12px 15px;
+    border: 2px solid var(--color-border);
+    border-radius: 25px;
+    font-size: 1em;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.search-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-element-light);
+}
+
+.search-input::placeholder {
+    color: var(--color-text-maxcontrast);
+    font-style: italic;
+}
+
+.search-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-maxcontrast);
+    pointer-events: none;
+    font-size: 1.1em;
+}
+
+.search-results-info {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: var(--color-text-maxcontrast);
+    font-style: italic;
+}
+
+/* Table Layout */
+.ebooks-table-container {
+    margin-top: 20px;
+    margin-bottom: 60px; /* Add bottom spacing for scrolling */
+    background: var(--color-main-background);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ebooks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.ebooks-table thead {
+    background: var(--color-background-hover);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.ebooks-table th {
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-main-text);
+    font-size: 0.85em;
+    white-space: nowrap;
+    position: relative;
+}
+
+/* Sortable header styles */
+.ebooks-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.ebooks-table th.sortable:hover {
+    background: var(--color-background-dark);
+}
+
+.ebooks-table th.sortable::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.ebooks-table th.sortable.sort-asc::after {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid var(--color-main-text);
+    opacity: 1;
+}
+
+.ebooks-table th.sortable.sort-desc::after {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--color-main-text);
+    opacity: 1;
+}
+
+.ebooks-table th.sortable:not(.sort-asc):not(.sort-desc):hover::after {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid var(--color-text-maxcontrast);
+    opacity: 0.5;
+}
+
+.col-icon {
+    width: 32px;
+    text-align: center;
+}
+
+.col-title {
+    width: auto;
+    min-width: 200px;
+}
+
+.col-author {
+    width: 150px;
+}
+
+.col-year {
+    width: 60px;
+    text-align: center;
+}
+
+.col-language {
+    width: 80px;
+    text-align: center;
+}
+
+.col-publisher {
+    width: 120px;
+}
+
+.col-format {
+    width: 70px;
+    text-align: center;
+}
+
+.col-size {
+    width: 80px;
+    text-align: right;
+}
+
+.col-progress {
+    width: 100px;
+    text-align: center;
+}
+
+.col-last-sync {
+    width: 100px;
+    text-align: center;
+}
+
+.col-actions {
+    width: 40px;
+    text-align: center;
+}
+
+.book-row {
+    border-bottom: 1px solid var(--color-border);
+    transition: background-color 0.2s ease;
+}
+
+.book-row:last-child {
+    border-bottom: none;
+}
+
+.book-row:hover {
+    background-color: var(--color-background-hover);
+}
+
+.ebooks-table td {
+    padding: 8px;
+    vertical-align: middle;
+}
+
+/* Icon cell */
+.book-icon-cell {
+    text-align: center;
+    width: 32px;
+}
+
+.book-icon-table {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+/* Title cell */
+.book-title-cell {
+    min-width: 200px;
+    max-width: 350px;
+}
+
+.book-title-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.book-title {
+    font-weight: 600;
+    color: var(--color-main-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.comic-info {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.comic-series-small,
+.comic-issue-small {
+    font-size: 0.75em;
+    color: var(--color-text-maxcontrast);
+    background: var(--color-background-dark);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.comic-issue-small {
+    background: var(--color-primary-element-light);
+    color: var(--color-primary-element-text-dark);
+    font-weight: 500;
+}
+
+/* Author cell */
+.book-author-cell {
+    width: 150px;
+}
+
+.book-author {
+    color: var(--color-text-maxcontrast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Year cell */
+.book-year-cell {
+    text-align: center;
+    width: 60px;
+}
+
+.book-year {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.9em;
+}
+
+/* Language cell */
+.book-language-cell {
+    text-align: center;
+    width: 80px;
+}
+
+.book-language {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.85em;
+    text-transform: uppercase;
+}
+
+/* Publisher cell */
+.book-publisher-cell {
+    width: 120px;
+}
+
+.book-publisher {
+    color: var(--color-text-maxcontrast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9em;
+}
+
+/* Format cell */
+.book-format-cell {
+    text-align: center;
+    width: 70px;
+}
+
+.format-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.format-epub {
+    background: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+
+.format-pdf {
+    background: #e74c3c;
+    color: white;
+}
+
+.format-cbr {
+    background: #f39c12;
+    color: white;
+}
+
+.format-mobi {
+    background: #9b59b6;
+    color: white;
+}
+
+/* Size cell */
+.book-size-cell {
+    width: 80px;
+    text-align: right;
+}
+
+.book-size {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.85em;
+}
+
+/* Progress cell */
+.book-progress-cell {
+    width: 100px;
+    text-align: center;
+}
+
+.progress-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    justify-content: center;
+    cursor: help;
+}
+
+.progress-bar-small {
+    width: 40px;
+    height: 4px;
+    background: var(--color-background-dark);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.progress-percentage {
+    font-size: 0.75em;
+    color: var(--color-text-maxcontrast);
+    font-weight: 500;
+    min-width: 30px;
+    text-align: center;
+}
+
+.progress-device {
+    font-size: 0.65em;
+    color: var(--color-text-lighter);
+    font-weight: normal;
+    text-align: center;
+    max-width: 50px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.no-progress {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.85em;
+}
+
+/* Last Sync cell */
+.book-last-sync-cell {
+    width: 100px;
+    text-align: center;
+}
+
+.last-sync-time {
+    font-size: 0.85em;
+    color: var(--color-main-text);
+}
+
+.no-sync {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.85em;
+}
+
+/* Actions cell */
+.book-actions-cell {
+    width: 40px;
+    text-align: center;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+    opacity: 0.6;
+}
+
+.action-btn:hover {
+    background: var(--color-background-dark);
+    opacity: 1;
+}
+
+/* Connection Info Styles */
+.ebooks-connection-info {
+    margin-bottom: 30px;
+    background: var(--color-main-background);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ebooks-connection-info details {
+    border: none;
+}
+
+.ebooks-connection-info summary {
+    padding: 16px 20px;
+    cursor: pointer;
+    background: var(--color-background-hover);
+    border-bottom: 1px solid var(--color-border);
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.ebooks-connection-info summary:hover {
+    background: var(--color-background-dark);
+}
+
+.connection-details {
+    padding: 20px;
+}
+
+.connection-section {
+    margin-bottom: 24px;
+}
+
+.connection-section:last-child {
+    margin-bottom: 0;
+}
+
+.connection-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.connection-section h4 {
+    margin: 16px 0 8px 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.connection-section p {
+    margin: 0 0 12px 0;
+    color: var(--color-text-maxcontrast);
+}
+
+.url-display {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.url-display input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.url-display input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.copy-btn {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-background-hover);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+    background: var(--color-background-dark);
+}
+
+.setting-row {
+    margin-bottom: 16px;
+}
+
+.setting-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: var(--color-main-text);
+}
+
+.password-setting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.password-input-group {
+    display: flex;
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+}
+
+.password-input-group input {
+    flex: 1;
+    padding: 8px 12px;
+    padding-right: 40px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+}
+
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    color: var(--color-text-maxcontrast);
+    z-index: 2;
+}
+
+.password-toggle:hover {
+    color: var(--color-main-text);
+}
+
+.password-setting .btn {
+    padding: 8px 16px;
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.password-setting .btn:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.password-setting .btn.secondary {
+    background: var(--color-background-hover);
+    border-color: var(--color-border);
+    color: var(--color-main-text);
+}
+
+.password-setting .btn.secondary:hover {
+    background: var(--color-background-dark);
+    border-color: var(--color-border-dark);
+}
+
+.password-status {
+    font-size: 0.9em;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--color-background-hover);
+    white-space: nowrap;
+}
+
+.setup-instructions ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.setup-instructions li {
+    margin-bottom: 4px;
+    color: var(--color-text-maxcontrast);
+}
+
+/* Form help text */
+.form-help {
+    display: block;
+    font-size: 0.85em;
+    color: var(--color-text-maxcontrast);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Readonly input styling */
+.readonly-input {
+    background: var(--color-background-hover) !important;
+    cursor: default !important;
+    color: var(--color-text-maxcontrast) !important;
+}
+
+/* Password display group */
+.password-display-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.password-display-group input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    padding-right: 40px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    position: relative;
+}
+
+.password-display-group .password-toggle {
+    position: absolute;
+    margin-left: -32px;
+    z-index: 2;
+}
+
+/* Button styles */
+.btn {
+    padding: 8px 16px;
+    border: 1px solid;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn.primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-text);
+}
+
+.btn.primary:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.btn.secondary {
+    background: var(--color-background-hover);
+    border-color: var(--color-border);
+    color: var(--color-main-text);
+}
+
+.btn.secondary:hover {
+    background: var(--color-background-dark);
+    border-color: var(--color-border-dark);
+}
+
+.btn.danger {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    color: white;
+}
+
+.btn.danger:hover {
+    background: var(--color-error-hover);
+    border-color: var(--color-error-hover);
+}
+
+.btn:disabled,
+.btn.disabled {
+    background: var(--color-background-hover) !important;
+    border-color: var(--color-border) !important;
+    color: var(--color-text-maxcontrast) !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}
+
+.btn:disabled:hover,
+.btn.disabled:hover {
+    background: var(--color-background-hover) !important;
+    border-color: var(--color-border) !important;
+    color: var(--color-text-maxcontrast) !important;
+}
+
+.reset-btn {
+    background: var(--color-warning);
+    border: 1px solid var(--color-warning);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.reset-btn:hover {
+    background: var(--color-warning-hover);
+    border-color: var(--color-warning-hover);
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+/* Sync actions */
+.sync-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sync-status {
+    font-size: 0.9em;
+    color: var(--color-success);
+    font-weight: 500;
+}
+
+/* Sync User Management Styles */
+.sync-user-form {
+    background: var(--color-background-hover);
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+.password-display-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.password-display-group input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.password-display-group .password-toggle {
+    position: static;
+    transform: none;
+    background: var(--color-background-hover);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin: 0;
+}
+
+.password-display-group .change-btn {
+    padding: 8px 12px;
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.password-display-group .change-btn:hover {
+    background: var(--color-primary-hover);
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.btn.secondary {
+    background: var(--color-background-hover);
+    border: 1px solid var(--color-border);
+    color: var(--color-main-text);
+}
+
+.btn.secondary:hover {
+    background: var(--color-background-dark);
+    border-color: var(--color-border-dark);
+}
+
+.form-row {
+    margin-bottom: 12px;
+}
+
+.form-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: var(--color-main-text);
+}
+
+.form-row input[type="text"],
+.form-row input[type="password"],
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="number"],
+.form-group input[type="password"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    box-sizing: border-box;
+}
+
+.form-row input:focus,
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.form-group input[readonly],
+.form-group select[readonly] {
+    background-color: var(--color-background-dark);
+    color: var(--color-text-maxcontrast);
+    cursor: not-allowed;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn.primary {
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+}
+
+.btn.primary:hover {
+    background: var(--color-primary-hover);
+}
+
+.btn.danger {
+    background: var(--color-error);
+    color: white;
+}
+
+.btn.danger:hover {
+    background: var(--color-error-hover);
+}
+
+.sync-settings {
+    background: var(--color-background-hover);
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.sync-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sync-status {
+    color: var(--color-success);
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+/* Reading Progress Styles */
+.book-progress {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border-dark);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-background-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75em;
+}
+
+.progress-text {
+    color: var(--color-main-text);
+    font-weight: 500;
+}
+
+.progress-device {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.7em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+/* API Access Controls Styles */
+.api-access-controls {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.api-access-controls h4 {
+    margin: 0 0 12px 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+.access-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toggle-info {
+    flex: 1;
+}
+
+.toggle-info strong {
+    display: block;
+    color: var(--color-main-text);
+    margin-bottom: 2px;
+}
+
+.toggle-info small {
+    color: var(--color-text-maxcontrast);
+    font-size: 0.85em;
+}
+
+/* Toggle Switch Styles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-background-dark);
+    transition: 0.3s;
+    border-radius: 24px;
+    border: 1px solid var(--color-border);
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input:checked + .slider {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+/* API User Management Styles */
+.api-user-form {
+    background: var(--color-background-hover);
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+.api-settings {
+    background: var(--color-background-hover);
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.api-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.api-status {
+    color: var(--color-success);
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+@media (max-width: 768px) {
+    #app {
+        padding: 16px;
+    }
+    
+    .ebooks-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+    }
+    
+    .ebooks-header h1 {
+        font-size: 2em;
+    }
+    
+    .connection-details {
+        padding: 16px;
+    }
+    
+    .password-setting {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .password-input-group {
+        min-width: unset;
+    }
+    
+    .progress-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .progress-device {
+        max-width: none;
+    }
+    
+    .toggle-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .switch {
+        align-self: flex-start;
+    }
+}
+
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--color-main-background);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 30px 20px 30px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: var(--color-main-text);
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--color-text-maxcontrast);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: var(--color-background-hover);
+    color: var(--color-main-text);
+}
+
+.modal-body {
+    padding: 30px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 30px 24px 30px;
+    border-top: 1px solid var(--color-border);
+}
+
+.modal-footer-right {
+    display: flex;
+    gap: 12px;
+}
+
+/* Form Styles */
+.form-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.form-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-bottom: 16px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group.full-width {
+    width: 100%;
+    flex: none;
+}
+
+.form-row .form-group.full-width {
+    flex: 1 1 100%;
+    width: 100%;
+}
+
+.form-group.form-group-small {
+    flex: 0 0 80px;
+}
+
+/* Legacy form-grid support for backwards compatibility */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-grid .form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--color-main-text);
+    margin-bottom: 6px;
+    font-size: 0.95em;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    font-size: 0.95em;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
+.comic-metadata-fields {
+    background: var(--color-background-hover);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.comic-metadata-fields h3 {
+    margin: 0 0 16px 0;
+    color: var(--color-main-text);
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+/* Upload Progress Styles */
+.upload-progress-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.upload-progress-item:last-child {
+    border-bottom: none;
+}
+
+.upload-file-icon {
+    font-size: 1.2em;
+    opacity: 0.7;
+}
+
+.upload-file-info {
+    flex: 1;
+}
+
+.upload-file-name {
+    font-weight: 500;
+    color: var(--color-main-text);
+    margin-bottom: 4px;
+}
+
+.upload-file-status {
+    font-size: 0.85em;
+    color: var(--color-text-maxcontrast);
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-background-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    /* Mobile form layout */
+    .form-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .form-group.form-group-small {
+        flex: 1;
+    }
+    
+    .form-section {
+        margin-bottom: 20px;
+    }
+    
+    /* Legacy grid support for mobile */
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 20px 0;
+    }
+    
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    
+    .upload-drop-zone {
+        padding: 30px 16px;
+    }
+    
+    .upload-icon {
+        font-size: 2.5em;
+    }
+    
+    /* Mobile table adjustments */
+    .ebooks-table-container {
+        margin-bottom: 80px; /* Increased spacing for mobile scrolling */
+    }
+    
+    .ebooks-table {
+        font-size: 0.8em;
+    }
+    
+    .ebooks-table th,
+    .ebooks-table td {
+        padding: 6px 4px;
+    }
+    
+    .col-author {
+        display: none;
+    }
+    
+    .book-author-cell {
+        display: none;
+    }
+    
+    .col-year {
+        display: none;
+    }
+    
+    .book-year-cell {
+        display: none;
+    }
+    
+    .col-language {
+        display: none;
+    }
+    
+    .book-language-cell {
+        display: none;
+    }
+    
+    .col-publisher {
+        display: none;
+    }
+    
+    .book-publisher-cell {
+        display: none;
+    }
+    
+    .col-size {
+        width: 60px;
+    }
+    
+    .col-progress {
+        width: 70px;
+    }
+    
+    .col-last-sync {
+        width: 70px;
+    }
+    
+    .progress-compact {
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .progress-bar-small {
+        width: 30px;
+        height: 3px;
+    }
+    
+    .progress-percentage {
+        font-size: 0.7em;
+    }
+    
+    .book-title {
+        font-size: 0.9em;
+    }
+    
+    .comic-info {
+        flex-wrap: wrap;
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "name": "international-omelette/nextcloud-koreader-companion",
+    "description": "Transform your Nextcloud into an authenticated OPDS ebook library with full KOReader sync support.",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Dominik Fischer",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "kiwilan/php-archive": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "OCA\\KoreaderCompanion\\": "lib/"
+        }
+    }
+}
