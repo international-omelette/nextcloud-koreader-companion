@@ -278,7 +278,7 @@ class KoreaderController extends Controller {
             $result->closeCursor();
 
             if ($row) {
-                $this->logger->debug('Found book by hash in mapping table', [
+                $this->logger->info('Found book by hash in mapping table', [
                     'hash' => $documentHash,
                     'user' => $userId,
                     'title' => $row['title'],
@@ -288,7 +288,7 @@ class KoreaderController extends Controller {
             }
 
             // Not found in mapping table - let's check if we can find it by scanning books
-            $this->logger->debug('Book not found in hash mapping table', [
+            $this->logger->info('Book not found in hash mapping table', [
                 'hash' => $documentHash,
                 'user' => $userId
             ]);
@@ -314,7 +314,7 @@ class KoreaderController extends Controller {
      */
     private function tryAutoIndex(string $documentHash, string $userId): bool {
         try {
-            $this->logger->debug('Attempting auto-index for unknown document', [
+            $this->logger->info('Attempting auto-index for unknown document', [
                 'hash' => $documentHash,
                 'user' => $userId
             ]);
@@ -322,7 +322,7 @@ class KoreaderController extends Controller {
             // Set user context for BookService
             $user = $this->userManager->get($userId);
             if (!$user) {
-                $this->logger->debug('Auto-index failed: user not found', ['user' => $userId]);
+                $this->logger->info('Auto-index failed: user not found', ['user' => $userId]);
                 return false;
             }
 
@@ -372,7 +372,7 @@ class KoreaderController extends Controller {
                     }
                     
                 } catch (\Exception $e) {
-                    $this->logger->debug('Error processing book during auto-index', [
+                    $this->logger->info('Error processing book during auto-index', [
                         'book_id' => $book['id'],
                         'error' => $e->getMessage()
                     ]);
@@ -380,7 +380,7 @@ class KoreaderController extends Controller {
                 }
             }
 
-            $this->logger->debug('Auto-index completed: no matching document found', [
+            $this->logger->info('Auto-index completed: no matching document found', [
                 'hash' => $documentHash,
                 'user' => $userId,
                 'books_checked' => count($books)
@@ -478,7 +478,7 @@ class KoreaderController extends Controller {
                 ])
                 ->executeStatement();
 
-            $this->logger->debug('Created hash mapping entry', [
+            $this->logger->info('Created hash mapping entry', [
                 'user' => $userId,
                 'hash' => $documentHash,
                 'hash_type' => $hashType,
@@ -500,7 +500,7 @@ class KoreaderController extends Controller {
     }
 
     /**
-     * Log unknown document hash for debugging
+     * Log unknown document hash
      *
      * @param string $documentHash MD5 hash from KOReader
      * @param string $userId Nextcloud username

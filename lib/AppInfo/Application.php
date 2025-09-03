@@ -3,6 +3,7 @@ namespace OCA\KoreaderCompanion\AppInfo;
 
 use OCA\KoreaderCompanion\Listener\FileUploadListener;
 use OCA\KoreaderCompanion\Listener\FileDeleteListener;
+use OCA\KoreaderCompanion\Service\PdfMetadataExtractor;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -10,6 +11,7 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\Files\Events\Node\NodeCreatedEvent;
 use OCP\Files\Events\Node\NodeWrittenEvent;
 use OCP\Files\Events\Node\NodeDeletedEvent;
+use Psr\Log\LoggerInterface;
 
 class Application extends App implements IBootstrap {
 
@@ -26,6 +28,13 @@ class Application extends App implements IBootstrap {
     }
 
     public function register(IRegistrationContext $context): void {
+        // Register services
+        $context->registerService(PdfMetadataExtractor::class, function ($c) {
+            return new PdfMetadataExtractor(
+                $c->get(LoggerInterface::class)
+            );
+        });
+        
         // Register the file upload listener for external upload detection
         $context->registerEventListener(NodeCreatedEvent::class, FileUploadListener::class);
         $context->registerEventListener(NodeWrittenEvent::class, FileUploadListener::class);

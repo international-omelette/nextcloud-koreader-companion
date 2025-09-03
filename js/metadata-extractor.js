@@ -404,7 +404,6 @@
             if (mobiMagic === 'BOOKMOBI' || new TextDecoder().decode(view.slice(60, 63)) === 'TPZ') {
                 // This is a valid MOBI file
                 // For now, we'll use filename parsing as full MOBI parsing is complex
-                // TODO: Implement proper MOBI header parsing
                 const filenameMetadata = extractMetadataFromFilename(file);
                 return { ...metadata, ...filenameMetadata, format: 'mobi' };
             } else {

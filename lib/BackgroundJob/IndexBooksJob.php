@@ -34,7 +34,7 @@ class IndexBooksJob extends TimedJob {
             $updatedBooks = 0;
             
             foreach ($users as $user) {
-                $this->logger->debug('Scanning books for user: ' . $user->getUID());
+                $this->logger->info('Scanning books for user: ' . $user->getUID());
                 
                 $userStats = $this->indexService->indexUserBooks($user->getUID());
                 $totalBooks += $userStats['total'];

@@ -473,7 +473,6 @@
         const filename = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
         const extension = file.name.toLowerCase().split('.').pop();
         
-        console.log('Extracting metadata from filename:', filename);
         
         let metadata = {
             title: filename,
@@ -541,7 +540,6 @@
             }
         }
 
-        console.log('Extracted metadata:', metadata);
         return metadata;
     }
 
@@ -549,7 +547,6 @@
         // Store file reference
         document.getElementById('file-path').value = file.name;
         
-        console.log('Populating form with metadata:', metadata);
         
         // Populate all fields
         Object.keys(metadata).forEach(key => {
@@ -597,9 +594,7 @@
         uploadData.append('file', file);
         
         // Add metadata
-        console.log('Upload form data being sent:');
         for (let [key, value] of formData.entries()) {
-            console.log(`  ${key}: ${value}`);
             uploadData.append(key, value);
         }
 

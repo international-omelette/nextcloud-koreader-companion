@@ -159,7 +159,6 @@ script('koreader_companion', 'upload');
             <p><?php p($l->t('Add some EPUB, PDF, CBR, or MOBI files to your eBooks folder to get started.')); ?></p>
         </div>
     <?php else: ?>
-        <!-- DEBUG: Found <?php p(count($_['books'])); ?> books -->
         
         <!-- Search Bar -->
         <div class="ebooks-search-container">

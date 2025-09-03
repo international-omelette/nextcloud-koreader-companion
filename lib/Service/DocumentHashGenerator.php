@@ -32,25 +32,25 @@ class DocumentHashGenerator {
     public function generateBinaryHash(string $filePath): ?string {
         try {
             if (!file_exists($filePath)) {
-                $this->logger->debug('Binary hash generation failed: file not found', ['file' => $filePath]);
+                $this->logger->info('Binary hash generation failed: file not found', ['file' => $filePath]);
                 return null;
             }
 
             if (!is_readable($filePath)) {
-                $this->logger->debug('Binary hash generation failed: file not readable', ['file' => $filePath]);
+                $this->logger->info('Binary hash generation failed: file not readable', ['file' => $filePath]);
                 return null;
             }
 
             $handle = fopen($filePath, 'rb');
             if (!$handle) {
-                $this->logger->debug('Binary hash generation failed: cannot open file', ['file' => $filePath]);
+                $this->logger->info('Binary hash generation failed: cannot open file', ['file' => $filePath]);
                 return null;
             }
 
             $fileSize = filesize($filePath);
             if ($fileSize === false) {
                 fclose($handle);
-                $this->logger->debug('Binary hash generation failed: cannot get file size', ['file' => $filePath]);
+                $this->logger->info('Binary hash generation failed: cannot get file size', ['file' => $filePath]);
                 return null;
             }
 
@@ -66,7 +66,7 @@ class DocumentHashGenerator {
                 
                 // Check if offset exceeds file size
                 if ($offset >= $fileSize) {
-                    $this->logger->debug('Binary hash: offset exceeds file size, stopping', [
+                    $this->logger->info('Binary hash: offset exceeds file size, stopping', [
                         'file' => basename($filePath),
                         'offset' => $offset,
                         'fileSize' => $fileSize,
@@ -77,7 +77,7 @@ class DocumentHashGenerator {
 
                 // Seek to offset
                 if (fseek($handle, $offset) !== 0) {
-                    $this->logger->debug('Binary hash: fseek failed, stopping', [
+                    $this->logger->info('Binary hash: fseek failed, stopping', [
                         'file' => basename($filePath),
                         'offset' => $offset,
                         'samplesRead' => $samplesRead
@@ -88,7 +88,7 @@ class DocumentHashGenerator {
                 // Read sample
                 $sample = fread($handle, $size);
                 if ($sample === false || strlen($sample) === 0) {
-                    $this->logger->debug('Binary hash: fread failed or empty, stopping', [
+                    $this->logger->info('Binary hash: fread failed or empty, stopping', [
                         'file' => basename($filePath),
                         'offset' => $offset,
                         'samplesRead' => $samplesRead
@@ -103,13 +103,13 @@ class DocumentHashGenerator {
             fclose($handle);
 
             if ($samplesRead === 0) {
-                $this->logger->debug('Binary hash generation failed: no samples read', ['file' => $filePath]);
+                $this->logger->info('Binary hash generation failed: no samples read', ['file' => $filePath]);
                 return null;
             }
 
             $hash = md5($samples);
             
-            $this->logger->debug('Binary hash generated successfully', [
+            $this->logger->info('Binary hash generated successfully', [
                 'file' => basename($filePath),
                 'fileSize' => $fileSize,
                 'samplesRead' => $samplesRead,
@@ -140,13 +140,13 @@ class DocumentHashGenerator {
             $filename = basename($filePath);
             
             if (empty($filename)) {
-                $this->logger->debug('Filename hash generation failed: empty filename', ['file' => $filePath]);
+                $this->logger->info('Filename hash generation failed: empty filename', ['file' => $filePath]);
                 return null;
             }
 
             $hash = md5($filename);
             
-            $this->logger->debug('Filename hash generated successfully', [
+            $this->logger->info('Filename hash generated successfully', [
                 'filename' => $filename,
                 'hash' => $hash
             ]);
@@ -179,7 +179,7 @@ class DocumentHashGenerator {
         $result['binary_hash'] = $this->generateBinaryHash($filePath);
         $result['filename_hash'] = $this->generateFilenameHash($filePath);
 
-        $this->logger->debug('Document hashes generated', [
+        $this->logger->info('Document hashes generated', [
             'file' => basename($filePath),
             'binary_hash' => $result['binary_hash'],
             'filename_hash' => $result['filename_hash']
@@ -199,7 +199,7 @@ class DocumentHashGenerator {
             // For Node objects, we need to read the content differently
             $content = $file->fopen('r');
             if (!$content) {
-                $this->logger->debug('Binary hash generation failed: cannot open node', ['file' => $file->getName()]);
+                $this->logger->info('Binary hash generation failed: cannot open node', ['file' => $file->getName()]);
                 return null;
             }
 
@@ -215,7 +215,7 @@ class DocumentHashGenerator {
                 
                 // Check if offset exceeds file size
                 if ($offset >= $fileSize) {
-                    $this->logger->debug('Binary hash (node): offset exceeds file size, stopping', [
+                    $this->logger->info('Binary hash (node): offset exceeds file size, stopping', [
                         'file' => $file->getName(),
                         'offset' => $offset,
                         'fileSize' => $fileSize,
@@ -226,7 +226,7 @@ class DocumentHashGenerator {
 
                 // Seek to offset
                 if (fseek($content, $offset) !== 0) {
-                    $this->logger->debug('Binary hash (node): fseek failed, stopping', [
+                    $this->logger->info('Binary hash (node): fseek failed, stopping', [
                         'file' => $file->getName(),
                         'offset' => $offset,
                         'samplesRead' => $samplesRead
@@ -237,7 +237,7 @@ class DocumentHashGenerator {
                 // Read sample
                 $sample = fread($content, $size);
                 if ($sample === false || strlen($sample) === 0) {
-                    $this->logger->debug('Binary hash (node): fread failed or empty, stopping', [
+                    $this->logger->info('Binary hash (node): fread failed or empty, stopping', [
                         'file' => $file->getName(),
                         'offset' => $offset,
                         'samplesRead' => $samplesRead
@@ -252,13 +252,13 @@ class DocumentHashGenerator {
             fclose($content);
 
             if ($samplesRead === 0) {
-                $this->logger->debug('Binary hash generation (node) failed: no samples read', ['file' => $file->getName()]);
+                $this->logger->info('Binary hash generation (node) failed: no samples read', ['file' => $file->getName()]);
                 return null;
             }
 
             $hash = md5($samples);
             
-            $this->logger->debug('Binary hash (node) generated successfully', [
+            $this->logger->info('Binary hash (node) generated successfully', [
                 'file' => $file->getName(),
                 'fileSize' => $fileSize,
                 'samplesRead' => $samplesRead,
@@ -289,13 +289,13 @@ class DocumentHashGenerator {
             $filename = $file->getName();
             
             if (empty($filename)) {
-                $this->logger->debug('Filename hash generation (node) failed: empty filename');
+                $this->logger->info('Filename hash generation (node) failed: empty filename');
                 return null;
             }
 
             $hash = md5($filename);
             
-            $this->logger->debug('Filename hash (node) generated successfully', [
+            $this->logger->info('Filename hash (node) generated successfully', [
                 'filename' => $filename,
                 'hash' => $hash
             ]);
@@ -329,7 +329,7 @@ class DocumentHashGenerator {
         $result['binary_hash'] = $this->generateBinaryHashFromNode($file);
         $result['filename_hash'] = $this->generateFilenameHashFromNode($file);
 
-        $this->logger->debug('Document hashes (node) generated', [
+        $this->logger->info('Document hashes (node) generated', [
             'file' => $file->getName(),
             'binary_hash' => $result['binary_hash'],
             'filename_hash' => $result['filename_hash']

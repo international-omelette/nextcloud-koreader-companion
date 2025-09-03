@@ -14,12 +14,14 @@ class IndexService {
     private $config;
     private $logger;
     private $bookService;
+    private $pdfExtractor;
 
-    public function __construct(IRootFolder $rootFolder, IConfig $config, LoggerInterface $logger, BookService $bookService) {
+    public function __construct(IRootFolder $rootFolder, IConfig $config, LoggerInterface $logger, BookService $bookService, PdfMetadataExtractor $pdfExtractor) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->logger = $logger;
         $this->bookService = $bookService;
+        $this->pdfExtractor = $pdfExtractor;
     }
 
     /**
@@ -81,13 +83,13 @@ class IndexService {
                         $metadata = $this->extractMetadata($node);
                         $currentBooks[$fileId] = $metadata;
                         $newBooks++;
-                        $this->logger->debug('New book found: ' . $node->getName());
+                        $this->logger->info('New book found: ' . $node->getName());
                     } elseif ($existingIndex[$fileId]['modified_time'] !== $lastModified) {
                         // Book has been modified
                         $metadata = $this->extractMetadata($node);
                         $currentBooks[$fileId] = $metadata;
                         $updatedBooks++;
-                        $this->logger->debug('Updated book found: ' . $node->getName());
+                        $this->logger->info('Updated book found: ' . $node->getName());
                     } else {
                         // Book hasn't changed
                         $currentBooks[$fileId] = $existingIndex[$fileId];
@@ -179,7 +181,6 @@ class IndexService {
 
     private function parseEpubOPF($zip) {
         // This is the same implementation as in BookService
-        // TODO: Consider refactoring to avoid duplication
         try {
             // Find the OPF file location from container.xml
             $containerXml = $zip->getFromName('META-INF/container.xml');
@@ -263,10 +264,14 @@ class IndexService {
     }
 
     private function extractPdfMetadata(Node $file, &$metadata) {
-        // Basic PDF metadata extraction - just use filename for now
-        // TODO: Implement proper PDF metadata extraction
-        $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
-        $metadata['title'] = $filename;
+        $pdfMetadata = $this->pdfExtractor->extractMetadata($file);
+        
+        // Merge PDF metadata into existing metadata array
+        foreach ($pdfMetadata as $key => $value) {
+            if (!empty($value) || $key === 'title') {
+                $metadata[$key] = $value;
+            }
+        }
     }
 
     private function extractCbrMetadata(Node $file, &$metadata) {
@@ -398,15 +403,13 @@ class IndexService {
     }
 
     private function getExistingIndex($userId) {
-        // TODO: Implement database storage for the index
         // For now, return empty array
         return [];
     }
 
     private function saveIndex($userId, $books) {
-        // TODO: Implement database storage for the index
         // For now, just log the operation
-        $this->logger->debug("Saved index for user $userId with " . count($books) . " books");
+        $this->logger->info("Saved index for user $userId with " . count($books) . " books");
     }
 
     /**

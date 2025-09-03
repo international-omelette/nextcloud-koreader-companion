@@ -17,19 +17,22 @@ class BookService {
     private $userSession;
     private $fileTrackingService;
     private $db;
+    private $pdfExtractor;
 
     public function __construct(
         IRootFolder $rootFolder, 
         IConfig $config, 
         IUserSession $userSession,
         FileTrackingService $fileTrackingService,
-        IDBConnection $db
+        IDBConnection $db,
+        PdfMetadataExtractor $pdfExtractor
     ) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->userSession = $userSession;
         $this->fileTrackingService = $fileTrackingService;
         $this->db = $db;
+        $this->pdfExtractor = $pdfExtractor;
     }
 
 
@@ -653,10 +656,14 @@ class BookService {
 
     private function extractPdfMetadata(Node $file, &$metadata) {
         try {
-            // For now, just parse the filename
-            // TODO: Implement proper PDF metadata extraction
-            $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
-            $metadata['title'] = $filename;
+            $pdfMetadata = $this->pdfExtractor->extractMetadata($file);
+            
+            // Merge PDF metadata into existing metadata array
+            foreach ($pdfMetadata as $key => $value) {
+                if (!empty($value) || $key === 'title') {
+                    $metadata[$key] = $value;
+                }
+            }
         } catch (\Exception $e) {
             // If extraction fails, keep defaults
         }

@@ -105,37 +105,6 @@ class PageController extends Controller {
      * @NoAdminRequired
      * @NoCSRFRequired
      */
-    public function debugBooks() {
-        $books = $this->bookService->getBooks();
-        $user = $this->userSession->getUser();
-        
-        $debug = [
-            'total_books' => count($books),
-            'archive_class_available' => class_exists('Kiwilan\Archive\Archive'),
-            'books_by_format' => [],
-            'books' => []
-        ];
-        
-        $formatCounts = [];
-        foreach ($books as $book) {
-            $format = $book['format'];
-            if (!isset($formatCounts[$format])) {
-                $formatCounts[$format] = 0;
-            }
-            $formatCounts[$format]++;
-            
-            $debug['books'][] = [
-                'title' => $book['title'],
-                'path' => $book['path'],
-                'format' => $format,
-                'size' => $book['size'],
-                'hash' => md5($book['path'])
-            ];
-        }
-        $debug['books_by_format'] = $formatCounts;
-        
-        return new DataResponse($debug);
-    }
 
     /**
      * @NoAdminRequired

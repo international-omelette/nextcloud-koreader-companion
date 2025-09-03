@@ -3,7 +3,6 @@
 return [
     'routes' => [
         ['name' => 'page#index', 'url' => '/', 'verb' => 'GET'],
-        ['name' => 'page#debugBooks', 'url' => '/debug/books', 'verb' => 'GET'],
         ['name' => 'page#getKoreaderPassword', 'url' => '/settings/koreader-password', 'verb' => 'GET'],
         ['name' => 'page#setKoreaderPassword', 'url' => '/settings/koreader-password', 'verb' => 'PUT'],
         ['name' => 'page#uploadBook', 'url' => '/upload', 'verb' => 'POST'],
