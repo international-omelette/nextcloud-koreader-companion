@@ -2,40 +2,35 @@
 
 Transform your Nextcloud into an authenticated OPDS ebook library with full KOReader sync support.
 
+## Personal Development Project
+
+**Important**: This app is developed for my personal use. While I'm happy to share my work with the community, please note:
+
+- **No guarantees**: The app is provided as-is without warranty
+- **Limited support**: I may not be able to provide extensive support or handle feature requests
+- **Personal focus**: Development priorities are based on my own needs
+
+Feel free to use, fork, or contribute, but please understand the limitations.
+
 ## Features
 
-- **OPDS Library**: Turn any Nextcloud folder into an OPDS-compatible ebook library
-- **KOReader Sync**: Full synchronization support with KOReader devices
-- **Multi-Format Support**: Works with EPUB and PDF files
-- **Secure Access**: Uses Nextcloud authentication for secure ebook access
-- **Cross-Device Sync**: Keep reading progress synchronized across all your devices
-- **Universal Compatibility**: Works with any OPDS-compatible ebook reader
+- OPDS-compatible ebook library from any Nextcloud folder
+- KOReader sync support for reading progress
+- Support for EPUB and PDF files
+- Secure authentication using Nextcloud credentials
 
 ## Installation
 
-1. Download the app from the Nextcloud App Store
-2. Enable the app in your Nextcloud admin panel
-3. Configure your ebook library folder in the admin settings
-4. Access your OPDS feed at: `https://your-nextcloud.com/apps/koreader_companion/opds`
-
-## Usage
-
-### For OPDS Readers
-Connect any OPDS-compatible reader to your Nextcloud using your regular Nextcloud credentials.
-
-### For KOReader
-Configure KOReader sync using the sync credentials available in the app settings.
+1. Download from Nextcloud App Store or install manually
+2. Enable in admin panel
+3. Configure ebook library path in admin settings
+4. Access OPDS feed at: `https://your-nextcloud.com/apps/koreader_companion/opds`
 
 ## Requirements
 
-- Nextcloud 25.0 or higher
-- PHP 8.0 or higher
+- Nextcloud 31
+- PHP 8.0+
 
 ## License
 
-This project is licensed under the AGPL-3.0-or-later License.
-
-## Support
-
-- [Issues](https://github.com/international-omelette/nextcloud-koreader-companion/issues)
-- [Repository](https://github.com/international-omelette/nextcloud-koreader-companion)
+AGPL-3.0-or-later

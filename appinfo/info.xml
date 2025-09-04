@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
-<info>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
   <id>koreader_companion</id>
   <name>KOReader Companion</name>
   <summary>OPDS library and KOReader sync for Nextcloud</summary>
@@ -12,7 +13,7 @@
   <bugs>https://github.com/international-omelette/nextcloud-koreader-companion/issues</bugs>
   <repository type="git">https://github.com/international-omelette/nextcloud-koreader-companion.git</repository>
   <dependencies>
-    <nextcloud min-version="25" max-version="31" />
+    <nextcloud min-version="31" max-version="31" />
   </dependencies>
   <settings>
     <admin>OCA\KoreaderCompanion\Settings\AdminSettings</admin>
