@@ -5,6 +5,8 @@
  * - OPDS uses Nextcloud credentials (no setup required)
  * - KOReader uses custom password stored in user preferences
  * - Clean separation between the two authentication systems
+ * 
+ * Version: 1.0.28-debug - Force cache refresh
  */
 
 $(document).ready(function() {
@@ -12,6 +14,7 @@ $(document).ready(function() {
     initEventListeners();
     initSearchFunctionality();
     initTableSorting();
+    initLoadMore();
 });
 
 function initEventListeners() {
@@ -498,5 +501,236 @@ function initTableSorting() {
         };
         
         return value * (multipliers[unit] || 1);
+    }
+}
+
+// Load More Button Implementation
+function initLoadMore() {
+    const tbody = $('.ebooks-table tbody');
+    if (tbody.length === 0) {
+        return;
+    }
+    
+    let currentPage = 1;
+    let loading = false;
+    let hasMorePages = true;
+    const perPage = 20;
+    
+    // Add load more button
+    const loadMoreButton = $('<div class="load-more-container" style="text-align: center; margin: 20px 0;"><button id="load-more-btn" class="btn primary" style="padding: 12px 24px; font-size: 16px;">Load more...</button></div>');
+    
+    // Insert after the table container
+    $('.ebooks-table-container').after(loadMoreButton);
+    
+    // Load more button click handler
+    $('#load-more-btn').on('click', function() {
+        loadMoreBooks();
+    });
+    
+    // Check if we need to show/hide button initially
+    updateLoadMoreVisibility();
+    
+    function updateLoadMoreVisibility() {
+        if (hasMorePages) {
+            $('#load-more-btn').show();
+        } else {
+            $('#load-more-btn').hide();
+        }
+    }
+    
+    async function loadMoreBooks() {
+        if (loading || !hasMorePages) {
+            return;
+        }
+        
+        loading = true;
+        currentPage++;
+        
+        // Show loading state on button
+        const loadMoreBtn = $('#load-more-btn');
+        const originalText = loadMoreBtn.html();
+        loadMoreBtn.prop('disabled', true).html('Loading...');
+        
+        try {
+            const url = OC.generateUrl('/apps/koreader_companion/') + `?page=${currentPage}&per_page=${perPage}`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'requesttoken': OC.requestToken
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const books = await response.json();
+            
+            if (!Array.isArray(books)) {
+                throw new Error('Invalid response format');
+            }
+            
+            if (books.length === 0) {
+                hasMorePages = false;
+                loadMoreBtn.hide();
+                return;
+            }
+            
+            // Append new book rows to table
+            books.forEach((book) => {
+                const bookRow = createBookRow(book);
+                tbody.append(bookRow);
+            });
+            
+            // If we got fewer books than requested, we've reached the end
+            if (books.length < perPage) {
+                hasMorePages = false;
+                loadMoreBtn.hide();
+            } else {
+                loadMoreBtn.prop('disabled', false).html(originalText);
+            }
+            
+        } catch (error) {
+            loadMoreBtn.html('Failed to load - Please refresh').addClass('danger');
+            hasMorePages = false;
+        } finally {
+            loading = false;
+        }
+    }
+    
+    function createBookRow(book) {
+        // Format year from publication_date
+        let yearDisplay = '-';
+        if (book.publication_date) {
+            const yearMatch = book.publication_date.match(/^(\d{4})-/);
+            if (yearMatch) {
+                yearDisplay = yearMatch[1];
+            } else {
+                yearDisplay = book.publication_date;
+            }
+        }
+        
+        // Format progress percentage
+        let progressHtml = '<span class="sync-status-none">-</span>';
+        if (book.progress && book.progress.percentage !== undefined) {
+            const percentage = Number(book.progress.percentage).toFixed(1);
+            const device = book.progress.device || 'Unknown';
+            const progressTooltip = `${percentage}% complete on ${device}`;
+            
+            progressHtml = `
+                <div class="progress-container" title="${progressTooltip}">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <span class="progress-text">${percentage}%</span>
+                </div>`;
+        }
+        
+        // Format last sync date
+        let lastSyncHtml = '<span class="sync-status-none">-</span>';
+        if (book.progress && book.progress.updated_at) {
+            const syncDate = new Date(book.progress.updated_at + 'Z'); // Assume UTC
+            const formattedDate = syncDate.toLocaleDateString();
+            const formattedTime = syncDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            lastSyncHtml = `<span class="sync-date" title="${formattedDate} ${formattedTime}">${formattedDate}</span>`;
+        }
+        
+        // Determine book icon based on format
+        let bookIcon = '📖'; // default
+        if (book.format === 'cbr') bookIcon = '📚';
+        else if (book.format === 'pdf') bookIcon = '📄';
+        else if (book.format === 'mobi') bookIcon = '📱';
+        
+        // Format file size
+        const fileSize = formatFileSize(book.size || 0);
+        
+        // Create book ID (base64 encoded path)
+        const bookId = btoa(book.path || '');
+        
+        // Build comic info if applicable
+        let comicInfo = '';
+        if (book.format === 'cbr' && (book.series || book.issue)) {
+            comicInfo = '<div class="comic-info">';
+            if (book.series) {
+                comicInfo += `<span class="comic-series-small">${escapeHtml(book.series)}</span>`;
+            }
+            if (book.issue) {
+                comicInfo += `<span class="comic-issue-small">#${escapeHtml(book.issue)}</span>`;
+            }
+            comicInfo += '</div>';
+        }
+        
+        const row = $(`
+            <tr class="book-row" data-format="${book.format}">
+                <td class="book-icon-cell">
+                    <span class="book-icon-table">${bookIcon}</span>
+                </td>
+                <td class="book-title-cell">
+                    <div class="book-title-wrapper">
+                        <span class="book-title" title="${escapeHtml(book.title || '')}">${escapeHtml(book.title || '')}</span>
+                        ${comicInfo}
+                    </div>
+                </td>
+                <td class="book-author-cell">
+                    <span class="book-author">${escapeHtml(book.author || '-')}</span>
+                </td>
+                <td class="book-year-cell">
+                    <span class="book-year">${yearDisplay}</span>
+                </td>
+                <td class="book-language-cell">
+                    <span class="book-language">${escapeHtml(book.language || '-')}</span>
+                </td>
+                <td class="book-publisher-cell">
+                    <span class="book-publisher">${escapeHtml(book.publisher || '-')}</span>
+                </td>
+                <td class="book-format-cell">
+                    <span class="format-badge format-${book.format}">${book.format.toUpperCase()}</span>
+                </td>
+                <td class="book-size-cell">
+                    <span class="book-size">${fileSize}</span>
+                </td>
+                <td class="book-progress-cell">
+                    ${progressHtml}
+                </td>
+                <td class="book-last-sync-cell">
+                    ${lastSyncHtml}
+                </td>
+                <td class="book-actions-cell">
+                    <button class="action-btn edit-metadata-btn" 
+                            data-book-id="${bookId}"
+                            data-title="${escapeHtml(book.title || '')}"
+                            data-author="${escapeHtml(book.author || '')}"
+                            data-format="${book.format || ''}"
+                            data-language="${escapeHtml(book.language || '')}"
+                            data-publisher="${escapeHtml(book.publisher || '')}"
+                            data-publication-date="${book.publication_date || ''}"
+                            data-description="${escapeHtml(book.description || '')}"
+                            data-tags="${escapeHtml(book.tags || '')}"
+                            data-series="${escapeHtml(book.series || '')}"
+                            data-issue="${escapeHtml(book.issue || '')}"
+                            data-volume="${escapeHtml(book.volume || '')}"
+                            title="Edit metadata">⚙️</button>
+                </td>
+            </tr>
+        `);
+        
+        return row;
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }

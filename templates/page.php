@@ -27,10 +27,12 @@ script('koreader_companion', 'upload');
         </div>
     </div>
 
-    <!-- Connection Info Section -->
-    <div class="ebooks-connection-info">
-        <details>
-            <summary><strong><?php p($l->t('📱 KOReader & eReader Setup')); ?></strong></summary>
+    <!-- Main Content Area (flexbox container for remaining space) -->
+    <div class="ebooks-main-content">
+        <!-- Connection Info Section -->
+        <div class="ebooks-connection-info">
+            <details>
+                <summary><strong><?php p($l->t('📱 KOReader & eReader Setup')); ?></strong></summary>
             <div class="connection-details">
                 
                 <!-- OPDS Section -->
@@ -150,30 +152,31 @@ script('koreader_companion', 'upload');
                 </div>
             </div>
         </details>
-    </div>
+        </div>
 
-    <?php if (empty($_['books'])): ?>
-        <div class="ebooks-empty">
-            <div class="icon-book"></div>
-            <h2><?php p($l->t('No books found')); ?></h2>
-            <p><?php p($l->t('Add some EPUB, PDF, CBR, or MOBI files to your eBooks folder to get started.')); ?></p>
-        </div>
-    <?php else: ?>
-        
-        <!-- Search Bar -->
-        <div class="ebooks-search-container">
-            <div class="search-wrapper">
-                <input type="search" 
-                       id="books-search" 
-                       placeholder="<?php p($l->t('Search by title or author...')); ?>" 
-                       class="search-input">
-                <div class="search-icon">🔍</div>
+        <?php if (empty($_['books'])): ?>
+            <div class="ebooks-empty">
+                <div class="icon-book"></div>
+                <h2><?php p($l->t('No books found')); ?></h2>
+                <p><?php p($l->t('Add some EPUB, PDF, CBR, or MOBI files to your eBooks folder to get started.')); ?></p>
             </div>
-            <div class="search-results-info" id="search-results-info" style="display: none;"></div>
-        </div>
-        
-        <div class="ebooks-table-container" id="books-container">
-            <table class="ebooks-table">
+        <?php else: ?>
+            
+            <!-- Search Bar -->
+            <div class="ebooks-search-container">
+                <div class="search-wrapper">
+                    <input type="search" 
+                           id="books-search" 
+                           placeholder="<?php p($l->t('Search by title or author...')); ?>" 
+                           class="search-input">
+                    <div class="search-icon">🔍</div>
+                </div>
+                <div class="search-results-info" id="search-results-info" style="display: none;"></div>
+            </div>
+            
+            <div class="ebooks-table-container" id="books-container">
+                <div class="ebooks-table-wrapper">
+                    <table class="ebooks-table">
                 <thead>
                     <tr>
                         <th class="col-icon"></th>
@@ -306,9 +309,11 @@ script('koreader_companion', 'upload');
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
-    <?php endif; ?>
+        <?php endif; ?>
+    </div> <!-- Close ebooks-main-content -->
 
     <!-- Metadata Edit Modal -->
     <div id="metadata-modal" class="modal" style="display: none;">

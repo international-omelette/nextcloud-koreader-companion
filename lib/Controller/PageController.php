@@ -51,10 +51,24 @@ class PageController extends Controller {
      * @NoCSRFRequired
      */
     public function index() {
-        $books = $this->bookService->getBooks();
+        $page = max(1, (int)$this->request->getParam('page', 1));
+        $perPage = min(50, max(10, (int)$this->request->getParam('per_page', 20)));
+        
         $user = $this->userSession->getUser();
         
-        // Progress information is now handled directly in BookService via hash mappings
+        // Check if this is an AJAX request for pagination
+        $acceptHeader = $this->request->getHeader('Accept');
+        $isAjax = (strpos($acceptHeader, 'application/json') !== false) || 
+                  ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
+        
+        if ($isAjax) {
+            // Return JSON for AJAX requests
+            $books = $this->bookService->getBooks($page, $perPage);
+            return new JSONResponse($books);
+        }
+        
+        // For first page load, get initial books with pagination
+        $books = $this->bookService->getBooks($page, $perPage);
         
         // Generate connection information
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
@@ -75,6 +89,10 @@ class PageController extends Controller {
                 'koreader_sync_url' => $koreaderSyncUrl,
                 'username' => $user ? $user->getUID() : '',
                 'has_koreader_password' => $hasKoreaderPassword
+            ],
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage
             ]
         ]);
     }

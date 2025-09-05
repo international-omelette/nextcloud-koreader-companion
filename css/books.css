@@ -1,21 +1,36 @@
-/* Nextcloud CSS Layout Fix - Known issue since v25+ */
-#content {
-    height: 100% !important;
-    overflow-y: auto !important;
+/* Let Nextcloud handle its own layout - no overrides */
+
+/* Fix flex layout constraints for proper scrolling */
+#app-content, .app-content {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
 }
 
-/* App container - follows Nextcloud patterns */
+/* App container - follows Nextcloud patterns with flexbox layout */
 #app {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
     padding: 20px;
     max-width: 1200px;
     margin: 0 auto;
-    height: auto;
-    overflow: visible;
 }
 
 .ebooks-header {
     margin-bottom: 30px;
     text-align: center;
+    flex-shrink: 0; /* Don't allow header to shrink */
+}
+
+/* Main content area - takes remaining space */
+.ebooks-main-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0; /* Allow shrinking below content size */
 }
 
 .ebooks-header h1 {
@@ -34,6 +49,7 @@
 /* Upload Area Styles */
 .ebooks-upload-area {
     margin: 30px 0;
+    flex-shrink: 0; /* Don't allow upload area to shrink */
 }
 
 .upload-drop-zone {
@@ -77,6 +93,11 @@
     text-align: center;
     padding: 60px 20px;
     color: var(--color-text-maxcontrast);
+    flex: 1; /* Take remaining space in main content area */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .ebooks-empty .icon-book {
@@ -99,6 +120,7 @@
 /* Search Bar Styles */
 .ebooks-search-container {
     margin: 20px 0;
+    flex-shrink: 0; /* Don't allow search bar to shrink */
 }
 
 .search-wrapper {
@@ -150,22 +172,85 @@
 /* Table Layout */
 .ebooks-table-container {
     margin-top: 20px;
-    margin-bottom: 60px; /* Add bottom spacing for scrolling */
+    margin-bottom: 20px;
     background: var(--color-main-background);
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    overflow: hidden;
+    overflow: auto; /* container scrolls */
+    box-sizing: border-box;
+    scrollbar-gutter: stable both-edges; /* keeps layout stable with scrollbars */
+    position: relative;
+    /* Use flexbox to take remaining space */
+    flex: 1;
+    min-height: 0; /* Allow flex item to shrink below content size */
+}
+
+.ebooks-table-wrapper {
+    overflow: visible; /* stop scrolling here */
+    padding-bottom: 0; /* no extra height */
+    height: auto; /* don't force 100% here */
+}
+
+.ebooks-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ebooks-table-container::-webkit-scrollbar-track {
+    background: var(--color-background-hover);
+    border-radius: 4px;
+}
+
+.ebooks-table-container::-webkit-scrollbar-thumb {
+    background: var(--color-border-dark);
+    border-radius: 4px;
+}
+
+.ebooks-table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
+}
+
+.ebooks-table-container::-webkit-scrollbar-corner {
+    background: var(--color-background-hover);
+}
+
+/* Load More Button */
+.load-more-container {
+    margin: 5px 0 50px 0;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+#load-more-btn {
+    min-width: 150px;
+    transition: all 0.3s ease;
+}
+
+#load-more-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#load-more-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .ebooks-table {
     width: 100%;
+    min-width: 1000px;
     border-collapse: collapse;
     font-size: 0.9em;
+    margin-bottom: 10px;
 }
 
 .ebooks-table thead {
     background: var(--color-background-hover);
     border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .ebooks-table th {
@@ -469,6 +554,7 @@
     background: var(--color-primary);
     border-radius: 2px;
     transition: width 0.3s ease;
+    min-width: 2px;
 }
 
 .progress-text {
@@ -547,6 +633,7 @@
     border: 1px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
+    flex-shrink: 0; /* Don't allow connection info to shrink */
 }
 
 .ebooks-connection-info details {
@@ -883,64 +970,10 @@
     margin-top: 12px;
 }
 
-.password-display-group {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.password-display-group input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-main-background);
-    color: var(--color-main-text);
-    font-family: monospace;
-    font-size: 0.9em;
-}
-
-.password-display-group .password-toggle {
-    position: static;
-    transform: none;
+.sync-settings {
     background: var(--color-background-hover);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 8px 10px;
-    margin: 0;
-}
-
-.password-display-group .change-btn {
-    padding: 8px 12px;
-    border: 1px solid var(--color-primary);
-    border-radius: 4px;
-    background: var(--color-primary);
-    color: var(--color-primary-text);
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.password-display-group .change-btn:hover {
-    background: var(--color-primary-hover);
-}
-
-.form-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    flex-wrap: wrap;
-}
-
-.btn.secondary {
-    background: var(--color-background-hover);
-    border: 1px solid var(--color-border);
-    color: var(--color-main-text);
-}
-
-.btn.secondary:hover {
-    background: var(--color-background-dark);
-    border-color: var(--color-border-dark);
+    padding: 16px;
+    border-radius: 8px;
 }
 
 .form-row {
@@ -986,56 +1019,6 @@
     cursor: not-allowed;
 }
 
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    text-decoration: none;
-    display: inline-block;
-}
-
-.btn.primary {
-    background: var(--color-primary);
-    color: var(--color-primary-text);
-}
-
-.btn.primary:hover {
-    background: var(--color-primary-hover);
-}
-
-.btn.danger {
-    background: var(--color-error);
-    color: white;
-}
-
-.btn.danger:hover {
-    background: var(--color-error-hover);
-}
-
-.sync-settings {
-    background: var(--color-background-hover);
-    padding: 16px;
-    border-radius: 8px;
-}
-
-.sync-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.sync-status {
-    color: var(--color-success);
-    font-weight: 500;
-    font-size: 0.9em;
-}
-
 /* Reading Progress Styles */
 .book-progress {
     margin-top: 12px;
@@ -1050,14 +1033,6 @@
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 6px;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-    min-width: 2px;
 }
 
 .progress-info {
@@ -1205,55 +1180,6 @@ input:focus + .slider {
     font-weight: 500;
     font-size: 0.9em;
 }
-
-@media (max-width: 768px) {
-    #app {
-        padding: 16px;
-    }
-    
-    .ebooks-grid {
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-        gap: 16px;
-    }
-    
-    .ebooks-header h1 {
-        font-size: 2em;
-    }
-    
-    .connection-details {
-        padding: 16px;
-    }
-    
-    .password-setting {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .password-input-group {
-        min-width: unset;
-    }
-    
-    .progress-info {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-    }
-    
-    .progress-device {
-        max-width: none;
-    }
-    
-    .toggle-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .switch {
-        align-self: flex-start;
-    }
-}
-
 
 /* Modal Styles */
 .modal {
@@ -1498,6 +1424,52 @@ input:focus + .slider {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    #app {
+        padding: 16px;
+    }
+    
+    .ebooks-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+    }
+    
+    .ebooks-header h1 {
+        font-size: 2em;
+    }
+    
+    .connection-details {
+        padding: 16px;
+    }
+    
+    .password-setting {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .password-input-group {
+        min-width: unset;
+    }
+    
+    .progress-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .progress-device {
+        max-width: none;
+    }
+    
+    .toggle-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .switch {
+        align-self: flex-start;
+    }
+    
     /* Mobile form layout */
     .form-row {
         flex-direction: column;
