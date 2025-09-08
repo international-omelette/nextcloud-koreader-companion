@@ -1,55 +1,153 @@
 /* Let Nextcloud handle its own layout - no overrides */
 
+/* Prevent transition artifacts during window resize */
+body.resizing * {
+    transition: none !important;
+}
+
 /* Fix flex layout constraints for proper scrolling */
 #app-content, .app-content {
     display: flex !important;
     flex-direction: column !important;
     min-height: 0 !important;
-    overflow: hidden !important;
 }
 
-/* App container - follows Nextcloud patterns with flexbox layout */
+/* App container - Nextcloud side pane layout */
 #app {
     display: flex;
-    flex-direction: column;
+    height: 100%;
+    width: 100%;
     flex: 1;
     min-height: 0;
-    padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+    min-width: 0;
 }
 
-.ebooks-header {
-    margin-bottom: 30px;
-    text-align: center;
-    flex-shrink: 0; /* Don't allow header to shrink */
-}
-
-/* Main content area - takes remaining space */
-.ebooks-main-content {
+/* Navigation sidebar */
+#app-navigation {
+    width: 250px;
+    background: var(--color-main-background);
+    border-right: 1px solid var(--color-border);
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0; /* Allow shrinking below content size */
+    transition: all 0.3s ease;
+    z-index: 100;
+    position: relative;
 }
 
-.ebooks-header h1 {
-    font-size: 2.5em;
+/* Primary action button */
+#app-navigation-new {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+#app-navigation-new button {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 6px;
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#app-navigation-new button:hover {
+    background: var(--color-primary-hover);
+}
+
+#app-navigation-new button .icon {
+    filter: invert(1);
+}
+
+/* Navigation menu */
+#app-navigation ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    transition: all 0.3s ease;
+}
+
+.nav-entry {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.nav-entry a {
+    display: block;
+    padding: 12px 16px;
+    color: var(--color-main-text);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.nav-entry a:hover {
+    background: var(--color-background-hover);
+}
+
+.nav-entry.active a {
+    background: var(--color-primary);
+    color: var(--color-primary-text);
+    border-left-color: var(--color-primary);
+    font-weight: 500;
+}
+
+/* Content area */
+#app-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    width: 0; /* force flex item to respect container width */
+    transition: all 0.3s ease;
+    z-index: 1;
+    position: relative;
+}
+
+/* Content sections */
+.content-section {
+    display: none;
+    padding: 15px;
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+    min-width: 0; /* allow content to shrink */
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.content-section.active {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%; /* constrain to parent width */
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Header wrapper - no styling on desktop, margin on mobile/tablet */
+.header-wrapper {
+    /* No styles on desktop */
+}
+
+.content-section h2 {
+    margin: 0 0 20px 0;
+    font-size: 1.8em;
     font-weight: 300;
-    margin: 0 0 10px 0;
     color: var(--color-main-text);
 }
 
-.ebooks-subtitle {
-    color: var(--color-text-maxcontrast);
-    font-size: 1.1em;
-    margin: 0;
-}
+/* Remove old header styles as we now use sections */
 
-/* Upload Area Styles */
+/* Upload Area Styles (now in modal) */
 .ebooks-upload-area {
-    margin: 30px 0;
-    flex-shrink: 0; /* Don't allow upload area to shrink */
+    margin: 0;
 }
 
 .upload-drop-zone {
@@ -103,12 +201,9 @@
 .ebooks-empty .icon-book {
     width: 64px;
     height: 64px;
-    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJjdXJyZW50Q29sb3IiPjxwYXRoIGQ9Ik0xOCAySDZjLTEuMSAwLTIgLjktMiAydjE2YzAgMS4xLjkgMiAyIDJoMTJjMS4xIDAgMi0uOSAyLTJWNGMwLTEuMS0uOS0yLTItMnpNNiA0aDV2OGwtMi41LTEuNUw2IDEyVjR6Ii8+PC9zdmc+');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
     margin: 0 auto 20px;
     opacity: 0.3;
+    /* Use Nextcloud's built-in icon system */
 }
 
 .ebooks-empty h2 {
@@ -119,14 +214,14 @@
 
 /* Search Bar Styles */
 .ebooks-search-container {
-    margin: 20px 0;
+    margin: 10px 0;
     flex-shrink: 0; /* Don't allow search bar to shrink */
 }
 
 .search-wrapper {
     position: relative;
-    max-width: 400px;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
 }
 
 .search-input {
@@ -171,24 +266,27 @@
 
 /* Table Layout */
 .ebooks-table-container {
-    margin-top: 20px;
-    margin-bottom: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
     background: var(--color-main-background);
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    overflow: auto; /* container scrolls */
+    overflow: auto; /* container scrolls horizontally */
     box-sizing: border-box;
-    scrollbar-gutter: stable both-edges; /* keeps layout stable with scrollbars */
+    scrollbar-gutter: stable; /* keeps layout stable with scrollbars */
     position: relative;
-    /* Use flexbox to take remaining space */
-    flex: 1;
-    min-height: 0; /* Allow flex item to shrink below content size */
+    /* Constrain width to parent and enable horizontal scrolling */
+    width: 100%;
+    max-width: 100%;
+    flex: 0 1 auto;
+    min-height: 0;
 }
 
 .ebooks-table-wrapper {
-    overflow: visible; /* stop scrolling here */
-    padding-bottom: 0; /* no extra height */
-    height: auto; /* don't force 100% here */
+    overflow: visible;
+    padding-bottom: 0;
+    height: auto;
+    min-width: 100%; /* ensure wrapper doesn't constrain table width */
 }
 
 .ebooks-table-container::-webkit-scrollbar {
@@ -261,6 +359,16 @@
     font-size: 0.85em;
     white-space: nowrap;
     position: relative;
+}
+
+/* First column (icon) header padding */
+.ebooks-table th:first-child {
+    padding: 12px 8px 12px 0;
+}
+
+/* Last column (actions) header padding */
+.ebooks-table th:last-child {
+    padding: 12px 8px;
 }
 
 /* Sortable header styles */
@@ -378,10 +486,20 @@
     vertical-align: middle;
 }
 
+/* First column (icon) body cell padding */
+.ebooks-table td:first-child {
+    padding: 8px;
+}
+
+/* Last column (actions) body cell padding */
+.ebooks-table td:last-child {
+    padding: 8px;
+}
+
 /* Icon cell */
 .book-icon-cell {
     text-align: center;
-    width: 32px;
+    width: 40px;
 }
 
 .book-icon-table {
@@ -606,19 +724,24 @@
 
 /* Actions cell */
 .book-actions-cell {
-    width: 40px;
+    width: 56px;
     text-align: center;
 }
 
 .action-btn {
     background: none;
     border: none;
-    padding: 4px;
+    padding: 8px;
     cursor: pointer;
     border-radius: 4px;
     transition: background-color 0.2s ease;
     font-size: 14px;
-    opacity: 0.6;
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
 }
 
 .action-btn:hover {
@@ -626,36 +749,7 @@
     opacity: 1;
 }
 
-/* Connection Info Styles */
-.ebooks-connection-info {
-    margin-bottom: 30px;
-    background: var(--color-main-background);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    overflow: hidden;
-    flex-shrink: 0; /* Don't allow connection info to shrink */
-}
-
-.ebooks-connection-info details {
-    border: none;
-}
-
-.ebooks-connection-info summary {
-    padding: 16px 20px;
-    cursor: pointer;
-    background: var(--color-background-hover);
-    border-bottom: 1px solid var(--color-border);
-    user-select: none;
-    transition: background-color 0.2s ease;
-}
-
-.ebooks-connection-info summary:hover {
-    background: var(--color-background-dark);
-}
-
-.connection-details {
-    padding: 20px;
-}
+/* Connection sections (now distributed across panes) */
 
 .connection-section {
     margin-bottom: 24px;
@@ -754,22 +848,28 @@
     color: var(--color-main-text);
 }
 
-.password-toggle {
+.password-input-group .password-toggle {
     position: absolute;
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    background: none;
-    border: none;
+    background: none !important;
+    border: none !important;
     cursor: pointer;
     font-size: 14px;
-    padding: 4px;
+    padding: 4px !important;
     color: var(--color-text-maxcontrast);
     z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
 }
 
-.password-toggle:hover {
+.password-input-group .password-toggle:hover {
     color: var(--color-main-text);
+    background: none !important;
 }
 
 .password-setting .btn {
@@ -1422,23 +1522,147 @@ input:focus + .slider {
     transition: width 0.3s ease;
 }
 
-/* Responsive Design */
+/* Navigation collapsed breakpoint - synchronized with Nextcloud's hamburger menu at 1024px */
+@media (max-width: 1024px) {
+    /* Tablet responsive adjustments - merged with navigation breakpoint */
+    .ebooks-table-container {
+        margin-left: 0;
+        margin-right: 0;
+        border-left: none;
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+    }
+    
+    /* Hide the navigation sidebar by default using transform for better performance */
+    #app-navigation {
+        position: fixed;
+        left: 0;
+        top: 50px; /* Account for Nextcloud header */
+        width: 250px;
+        height: calc(100vh - 50px);
+        z-index: 2000; /* High z-index to appear above content */
+        background: var(--color-main-background);
+        border-right: 1px solid var(--color-border);
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        transform: translateX(-100%); /* Move out of view using transform */
+        transition: transform 0.3s ease;
+        transition-delay: 0s;
+        will-change: transform;
+        overflow-y: auto;
+    }
+    
+    /* Show navigation with single state class */
+    body.navigation-open #app-navigation {
+        transform: translateX(0);
+    }
+    
+    /* Ensure content area uses the full width when navigation is hidden */
+    #app-content {
+        flex: 1;
+        width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        transition: all 0.3s ease;
+    }
+    
+    /* Remove horizontal padding completely for edge-to-edge table */
+    .content-section {
+        padding: 5px 0 !important;
+        transition: padding 0.3s ease;
+    }
+    
+    /* Table container spans full width edge-to-edge - simplified approach */
+    .ebooks-table-container {
+        margin-left: 0;
+        margin-right: 0;
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+        width: 100%;
+        max-width: none;
+        position: relative;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+    }
+    
+    /* Header wrapper with 15px margin on tablet */
+    .header-wrapper {
+        margin-left: 30px;
+        margin-right: 15px
+    }
+    
+    /* Remove h2 from individual padding since it's in header-wrapper now */
+    .load-more-container,
+    .ebooks-empty {
+        padding-left: 12px;
+        padding-right: 12px;
+        transition: padding 0.3s ease;
+    }
+    
+    /* Search container: remove 80% width, use 15px margin from header-wrapper */
+    .ebooks-search-container {
+        margin: 0px 0px 5px 0px;
+        transition: all 0.3s ease;
+    }
+    
+    /* Ensure other connection sections have proper padding */
+    .connection-section {
+        padding-left: 12px;
+        padding-right: 12px;
+        transition: padding 0.3s ease;
+    }
+}
+
+/* Mobile responsive navigation - minimal approach */
 @media (max-width: 768px) {
     #app {
-        padding: 16px;
+        flex-direction: column;
     }
     
-    .ebooks-grid {
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-        gap: 16px;
+    #app-navigation {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
     }
     
-    .ebooks-header h1 {
-        font-size: 2em;
+    #app-navigation ul {
+        flex-direction: column;
     }
     
-    .connection-details {
-        padding: 16px;
+    .nav-entry a {
+        border-left: 3px solid transparent;
+        border-bottom: none;
+    }
+    
+    .nav-entry.active a {
+        border-left-color: var(--color-primary);
+        border-bottom: none;
+    }
+    
+    /* Header wrapper with 15px margin on mobile */
+    .header-wrapper {
+        margin-left: 30px;
+        margin-right: 15px;
+    }
+    
+    /* Add padding back to content that needs it */
+    .load-more-container,
+    .ebooks-empty {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    
+    /* Search container: remove 80% width, use 15px margin from header-wrapper */
+    .ebooks-search-container {
+        margin: 0px 0px 5px 0px;
+        transition: all 0.3s ease;
+    }
+    
+    .connection-section {
+        padding-left: 16px;
+        padding-right: 16px;
     }
     
     .password-setting {
@@ -1448,16 +1672,6 @@ input:focus + .slider {
     
     .password-input-group {
         min-width: unset;
-    }
-    
-    .progress-info {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-    }
-    
-    .progress-device {
-        max-width: none;
     }
     
     .toggle-row {
@@ -1480,16 +1694,6 @@ input:focus + .slider {
         flex: 1;
     }
     
-    .form-section {
-        margin-bottom: 20px;
-    }
-    
-    /* Legacy grid support for mobile */
-    .form-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-    
     .modal-content {
         width: 95%;
         margin: 20px 0;
@@ -1502,17 +1706,13 @@ input:focus + .slider {
         padding-right: 20px;
     }
     
-    .upload-drop-zone {
-        padding: 30px 16px;
-    }
-    
-    .upload-icon {
-        font-size: 2.5em;
-    }
-    
-    /* Mobile table adjustments */
+    /* Mobile table adjustments - edge to edge */
     .ebooks-table-container {
-        margin-bottom: 80px; /* Increased spacing for mobile scrolling */
+        margin: 0;
+        margin-bottom: 80px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
     }
     
     .ebooks-table {
@@ -1524,69 +1724,36 @@ input:focus + .slider {
         padding: 6px 4px;
     }
     
-    .col-author {
-        display: none;
-    }
-    
-    .book-author-cell {
-        display: none;
-    }
-    
-    .col-year {
-        display: none;
-    }
-    
-    .book-year-cell {
-        display: none;
-    }
-    
-    .col-language {
-        display: none;
-    }
-    
-    .book-language-cell {
-        display: none;
-    }
-    
-    .col-publisher {
-        display: none;
-    }
-    
+    .col-author,
+    .book-author-cell,
+    .col-year,
+    .book-year-cell,
+    .col-language,
+    .book-language-cell,
+    .col-publisher,
     .book-publisher-cell {
         display: none;
     }
-    
-    .col-size {
-        width: 60px;
-    }
-    
-    .col-progress {
-        width: 70px;
-    }
-    
-    .col-last-sync {
-        width: 70px;
-    }
-    
-    .progress-compact {
-        flex-direction: column;
-        gap: 2px;
-    }
-    
-    .progress-bar-small {
-        width: 30px;
-        height: 3px;
-    }
-    
-    .progress-percentage {
-        font-size: 0.7em;
-    }
-    
-    .book-title {
-        font-size: 0.9em;
-    }
-    
-    .comic-info {
-        flex-wrap: wrap;
-    }
+}
+
+/* Nextcloud icon integration - using built-in icon classes */
+.copy-btn, .password-toggle {
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background: var(--color-background-hover);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.copy-btn:hover, .password-toggle:hover {
+    background: var(--color-primary-light);
+}
+
+.upload-file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

@@ -10,12 +10,100 @@
  */
 
 $(document).ready(function() {
+    initSidePaneNavigation();
+    initUploadModal();
     checkKoreaderPassword();
     initEventListeners();
     initSearchFunctionality();
     initTableSorting();
     initLoadMore();
+    initResponsiveHandling();
+    initHamburgerMenu();
 });
+
+// Handle responsive layout transitions smoothly
+function initResponsiveHandling() {
+    let resizeTimeout;
+    
+    // Handle window resize with debouncing
+    $(window).on('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            // Add a class during resize to prevent transition artifacts
+            $('body').addClass('resizing');
+            
+            setTimeout(function() {
+                $('body').removeClass('resizing');
+            }, 300);
+        }, 100);
+    });
+}
+
+// Navigation management for side pane
+function initSidePaneNavigation() {
+    $('.nav-entry').on('click', function(e) {
+        e.preventDefault();
+        const section = $(this).data('section');
+        switchToSection(section);
+    });
+}
+
+function switchToSection(sectionName) {
+    // Remove active class from all sections and nav items
+    $('.content-section').removeClass('active');
+    $('.nav-entry').removeClass('active');
+    
+    // Use a small delay to ensure smooth transitions
+    setTimeout(() => {
+        // Show target section with smooth transition
+        const targetSection = $(`#${sectionName}-section`);
+        const targetNav = $(`[data-section="${sectionName}"]`);
+        
+        if (targetSection.length) {
+            targetSection.addClass('active');
+        }
+        
+        if (targetNav.length) {
+            targetNav.addClass('active');
+        }
+        
+        // Update URL hash for bookmarking
+        window.location.hash = sectionName;
+    }, 50);
+}
+
+// Upload modal management
+function initUploadModal() {
+    // Open upload modal when clicking the primary action button
+    $('#new-book-btn').on('click', function() {
+        $('#upload-modal').show();
+    });
+    
+    // Close upload modal
+    $('#close-upload-modal').on('click', function() {
+        $('#upload-modal').hide();
+    });
+    
+    // Close modal when clicking outside
+    $('#upload-modal').on('click', function(e) {
+        if (e.target === this) {
+            $(this).hide();
+        }
+    });
+    
+    // ESC key closes modal
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape') {
+            $('.modal:visible').hide();
+        }
+    });
+    
+    // Initialize from URL hash if present
+    const hash = window.location.hash.substring(1);
+    if (hash && ['books', 'sync', 'opds'].includes(hash)) {
+        switchToSection(hash);
+    }
+}
 
 function initEventListeners() {
     // KOReader password management
@@ -49,6 +137,29 @@ function initEventListeners() {
     // Click-to-select for easier copying
     $('.selectable-input').on('click', function() {
         this.select();
+    });
+    
+    // Edit metadata button handler (using event delegation for dynamically added buttons)
+    $(document).on('click', '.edit-metadata-btn', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const bookData = {
+            bookId: $(this).data('book-id'),
+            title: $(this).data('title'),
+            author: $(this).data('author'),
+            format: $(this).data('format'),
+            language: $(this).data('language'),
+            publisher: $(this).data('publisher'),
+            publicationDate: $(this).data('publication-date'),
+            description: $(this).data('description'),
+            tags: $(this).data('tags'),
+            series: $(this).data('series'),
+            issue: $(this).data('issue'),
+            volume: $(this).data('volume')
+        };
+        
+        showEditMetadataModal(bookData);
     });
     
     // Initial button validation
@@ -241,11 +352,11 @@ function togglePasswordVisibility(inputId) {
     
     if (input.type === 'password') {
         input.type = 'text';
-        toggleBtn.innerHTML = '🙈';
+        toggleBtn.innerHTML = '<span class="icon icon-toggle"></span>';
         toggleBtn.title = t('koreader_companion', 'Hide password');
     } else {
         input.type = 'password';
-        toggleBtn.innerHTML = '👁️';
+        toggleBtn.innerHTML = '<span class="icon icon-toggle"></span>';
         toggleBtn.title = t('koreader_companion', 'Show password');
     }
 }
@@ -639,10 +750,10 @@ function initLoadMore() {
         }
         
         // Determine book icon based on format
-        let bookIcon = '📖'; // default
-        if (book.format === 'cbr') bookIcon = '📚';
-        else if (book.format === 'pdf') bookIcon = '📄';
-        else if (book.format === 'mobi') bookIcon = '📱';
+        let bookIcon = ''; // default
+        if (book.format === 'cbr') bookIcon = '';
+        else if (book.format === 'pdf') bookIcon = '';
+        else if (book.format === 'mobi') bookIcon = '';
         
         // Format file size
         const fileSize = formatFileSize(book.size || 0);
@@ -712,7 +823,9 @@ function initLoadMore() {
                             data-series="${escapeHtml(book.series || '')}"
                             data-issue="${escapeHtml(book.issue || '')}"
                             data-volume="${escapeHtml(book.volume || '')}"
-                            title="Edit metadata">⚙️</button>
+                            title="Edit metadata">
+                            <span class="icon icon-edit"></span>
+                        </button>
                 </td>
             </tr>
         `);
@@ -732,5 +845,326 @@ function initLoadMore() {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+}
+
+// Edit metadata modal functionality
+function showEditMetadataModal(bookData) {
+    const metadataModal = document.getElementById('metadata-modal');
+    const deleteButton = document.getElementById('delete-metadata');
+    const saveButton = document.getElementById('save-metadata');
+    
+    if (!metadataModal) {
+        console.error('Metadata modal not found');
+        return;
+    }
+    
+    // Show the modal
+    metadataModal.style.display = 'flex';
+    
+    // Show delete button for editing existing books
+    if (deleteButton) {
+        deleteButton.style.display = 'inline-block';
+    }
+    
+    // Change save button text for editing
+    if (saveButton) {
+        saveButton.textContent = 'Save Changes';
+    }
+    
+    // Populate form with existing book data
+    populateEditForm(bookData);
+}
+
+function populateEditForm(bookData) {
+    // Populate form fields with existing book data
+    const fields = {
+        'file-path': bookData.bookId,
+        'book-title': bookData.title || '',
+        'book-author': bookData.author || '',
+        'book-date': bookData.publicationDate || '',
+        'book-language': bookData.language || '',
+        'book-publisher': bookData.publisher || '',
+        'book-format': bookData.format || '',
+        'comic-series': bookData.series || '',
+        'comic-issue': bookData.issue || '',
+        'comic-volume': bookData.volume || ''
+    };
+    
+    // Populate each field
+    Object.entries(fields).forEach(([fieldId, value]) => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = value;
+        }
+    });
+    
+    // Show/hide comic fields based on format
+    const comicFields = document.getElementById('comic-fields');
+    if (comicFields) {
+        const isComic = bookData.format && bookData.format.toLowerCase() === 'cbr';
+        comicFields.style.display = isComic ? 'block' : 'none';
+    }
+    
+    // Focus on title field
+    const titleField = document.getElementById('book-title');
+    if (titleField) {
+        titleField.focus();
+        titleField.select();
+    }
+    
+    // Update save button handler for editing
+    updateSaveButtonForEdit(bookData);
+}
+
+function updateSaveButtonForEdit(bookData) {
+    const saveButton = document.getElementById('save-metadata');
+    if (!saveButton) return;
+    
+    // Remove any existing event listeners
+    const newSaveButton = saveButton.cloneNode(true);
+    saveButton.parentNode.replaceChild(newSaveButton, saveButton);
+    
+    // Add new event listener for editing
+    newSaveButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        saveEditedMetadata(bookData.bookId);
+    });
+}
+
+function saveEditedMetadata(bookId) {
+    const formData = new URLSearchParams();
+    
+    // Collect form data
+    const fields = [
+        'book-title', 'book-author', 'book-date', 'book-language', 
+        'book-publisher', 'comic-series', 'comic-issue', 'comic-volume'
+    ];
+    
+    fields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field && field.value) {
+            const paramName = fieldId.replace('book-', '').replace('comic-', '').replace('-', '_');
+            if (paramName === 'date') {
+                formData.append('publication_date', field.value);
+            } else {
+                formData.append(paramName, field.value);
+            }
+        }
+    });
+    
+    // Show loading state
+    const saveButton = document.getElementById('save-metadata');
+    if (saveButton) {
+        saveButton.textContent = 'Saving...';
+        saveButton.disabled = true;
+    }
+    
+    // Send update request
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', OC.generateUrl('/apps/koreader_companion/books/{id}/metadata', {id: bookId}), true);
+    xhr.setRequestHeader('requesttoken', OC.requestToken);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    
+    xhr.onload = function() {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Changes';
+        }
+        
+        if (xhr.status === 200) {
+            try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    showNotification('Book metadata updated successfully', 'success');
+                    hideEditMetadataModal();
+                    // Refresh the books list
+                    if (typeof loadBooks === 'function') {
+                        loadBooks();
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    showNotification(`Failed to update metadata: ${response.error}`, 'error');
+                }
+            } catch (e) {
+                console.error('Parse error:', e);
+                showNotification('Failed to update metadata', 'error');
+            }
+        } else {
+            showNotification(`Failed to update metadata (${xhr.status})`, 'error');
+        }
+    };
+    
+    xhr.onerror = function() {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Changes';
+        }
+        showNotification('Network error updating metadata', 'error');
+    };
+    
+    xhr.send(formData);
+}
+
+function hideEditMetadataModal() {
+    const metadataModal = document.getElementById('metadata-modal');
+    const deleteButton = document.getElementById('delete-metadata');
+    const saveButton = document.getElementById('save-metadata');
+    
+    if (metadataModal) {
+        metadataModal.style.display = 'none';
+    }
+    
+    // Reset buttons for next use
+    if (deleteButton) {
+        deleteButton.style.display = 'none';
+    }
+    
+    if (saveButton) {
+        saveButton.textContent = 'Save & Add to Library';
+    }
+}
+
+// Make functions globally accessible
+window.showEditMetadataModal = showEditMetadataModal;
+window.hideEditMetadataModal = hideEditMetadataModal;
+
+/**
+ * Initialize hamburger menu functionality for mobile navigation
+ * This creates a hamburger toggle button and manages navigation show/hide
+ */
+function initHamburgerMenu() {
+    // Only initialize on mobile screens (matching CSS breakpoint)
+    if (window.innerWidth > 1024) {
+        return;
+    }
+    
+    // Create hamburger menu button if it doesn't exist
+    let hamburgerBtn = document.getElementById('app-navigation-toggle');
+    if (!hamburgerBtn) {
+        hamburgerBtn = createHamburgerButton();
+    }
+    
+    // Add click handler
+    hamburgerBtn.addEventListener('click', toggleNavigation);
+    
+    // Close navigation when clicking outside
+    document.addEventListener('click', handleOutsideClick);
+    
+    // Close navigation when clicking on menu items
+    const navEntries = document.querySelectorAll('.nav-entry a');
+    navEntries.forEach(entry => {
+        entry.addEventListener('click', closeNavigation);
+    });
+    
+    // Handle window resize with improved debouncing
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                // Desktop view - close navigation if open
+                navigationOpen = false;
+                document.body.classList.remove('navigation-open');
+            }
+        }, 150);
+    });
+}
+
+function createHamburgerButton() {
+    const hamburgerBtn = document.createElement('button');
+    hamburgerBtn.id = 'app-navigation-toggle';
+    hamburgerBtn.className = 'hamburger-menu-btn';
+    hamburgerBtn.innerHTML = '<span class="icon icon-menu"></span>';
+    hamburgerBtn.setAttribute('aria-label', 'Toggle navigation menu');
+    hamburgerBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 2001;
+        background: var(--color-main-background);
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        padding: 8px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    `;
+    
+    // Insert at the beginning of the app content
+    const appContent = document.getElementById('app-content');
+    if (appContent && appContent.parentNode) {
+        appContent.parentNode.insertBefore(hamburgerBtn, appContent);
+    } else {
+        document.body.appendChild(hamburgerBtn);
+    }
+    
+    return hamburgerBtn;
+}
+
+// Navigation state management
+let navigationOpen = false;
+
+function toggleNavigation(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const body = document.body;
+    const nav = document.getElementById('app-navigation');
+    
+    // Check current state to ensure sync
+    const isCurrentlyOpen = body.classList.contains('navigation-open');
+    navigationOpen = !isCurrentlyOpen;
+    
+    if (navigationOpen) {
+        // Opening - force immediate start of transition
+        nav.style.transition = 'none';
+        nav.offsetHeight; // Force reflow to ensure no transition
+        nav.style.transition = 'transform 0.3s ease';
+        body.classList.add('navigation-open');
+    } else {
+        // Closing - force immediate start of transition
+        nav.style.transition = 'none';
+        nav.offsetHeight; // Force reflow
+        nav.style.transition = 'transform 0.3s ease';
+        body.classList.remove('navigation-open');
+    }
+}
+
+function closeNavigation() {
+    const body = document.body;
+    const nav = document.getElementById('app-navigation');
+    
+    if (body.classList.contains('navigation-open')) {
+        // Force immediate start of close transition
+        nav.style.transition = 'none';
+        nav.offsetHeight; // Force reflow
+        nav.style.transition = 'transform 0.3s ease';
+        
+        // Close navigation
+        navigationOpen = false;
+        body.classList.remove('navigation-open');
+    }
+}
+
+function handleOutsideClick(e) {
+    const nav = document.getElementById('app-navigation');
+    const hamburgerBtn = document.getElementById('app-navigation-toggle');
+    const body = document.body;
+    
+    if (!nav || !hamburgerBtn) return;
+    
+    // Only handle if navigation is actually open
+    if (!body.classList.contains('navigation-open')) return;
+    
+    // Check if click was inside navigation or on hamburger button
+    const isClickInsideNav = nav.contains(e.target);
+    const isClickOnHamburger = hamburgerBtn.contains(e.target);
+    
+    if (!isClickInsideNav && !isClickOnHamburger) {
+        // Close navigation and sync state
+        navigationOpen = false;
+        body.classList.remove('navigation-open');
     }
 }
