@@ -66,8 +66,22 @@
         const cancelButton = document.getElementById('cancel-metadata');
         const closeUploadModal = document.getElementById('close-upload-modal');
         
-        if (closeModal) closeModal.addEventListener('click', hideMetadataModal);
-        if (cancelButton) cancelButton.addEventListener('click', hideMetadataModal);
+        if (closeModal) closeModal.addEventListener('click', function() {
+            // Check if we're in edit mode or upload mode
+            if (window.hideEditMetadataModal && document.getElementById('delete-metadata').style.display !== 'none') {
+                window.hideEditMetadataModal();
+            } else {
+                hideMetadataModal();
+            }
+        });
+        if (cancelButton) cancelButton.addEventListener('click', function() {
+            // Check if we're in edit mode or upload mode
+            if (window.hideEditMetadataModal && document.getElementById('delete-metadata').style.display !== 'none') {
+                window.hideEditMetadataModal();
+            } else {
+                hideMetadataModal();
+            }
+        });
         if (closeUploadModal) closeUploadModal.addEventListener('click', hideUploadProgressModal);
         
         // Save button handler
@@ -396,6 +410,12 @@
         // Show the modal first with loading state
         metadataModal.style.display = 'flex';
         
+        // Hide delete button for new entries (only show for editing existing books)
+        const deleteButton = document.getElementById('delete-metadata');
+        if (deleteButton) {
+            deleteButton.style.display = 'none';
+        }
+        
         // Show loading indicator
         const titleField = document.getElementById('book-title');
         if (titleField) {
@@ -672,7 +692,9 @@
         progressItem.id = `progress-${encodeURIComponent(filename)}`;
         
         progressItem.innerHTML = `
-            <div class="upload-file-icon">📚</div>
+            <div class="upload-file-icon">
+                <span class="icon icon-file"></span>
+            </div>
             <div class="upload-file-info">
                 <div class="upload-file-name">${filename}</div>
                 <div class="upload-file-status">Uploading...</div>
