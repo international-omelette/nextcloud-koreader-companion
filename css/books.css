@@ -1,5 +1,49 @@
 /* Let Nextcloud handle its own layout - no overrides */
 
+/* CSS Custom Properties for consistent styling */
+:root {
+    --transition-standard: all 0.3s ease;
+    --transition-fast: all 0.2s ease;
+    --padding-form-input: 8px 12px;
+    --padding-form-large: 10px 12px;
+    --padding-button: 8px 16px;
+    --padding-small: 8px;
+    --border-radius-small: 4px;
+    --border-radius-medium: 6px;
+    --border-radius-large: 8px;
+    --border-radius-xl: 12px;
+    --format-color-pdf: #e74c3c;
+    --format-color-cbr: #f39c12;
+    --format-color-mobi: #9b59b6;
+}
+
+/* Universal transition system for interactive elements */
+button,
+input,
+select,
+textarea,
+a,
+[role="button"],
+.action-btn,
+.btn,
+.nav-entry a,
+.book-row {
+    transition: var(--transition-fast);
+}
+
+/* Specific transition overrides for complex animations */
+.content-section {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.progress-fill {
+    transition: width 0.3s ease;
+}
+
+#app-navigation {
+    transition: var(--transition-standard);
+}
+
 /* Prevent transition artifacts during window resize */
 body.resizing * {
     transition: none !important;
@@ -30,7 +74,7 @@ body.resizing * {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s ease;
+    transition: var(--transition-standard);
     z-index: 100;
     position: relative;
 }
@@ -50,7 +94,6 @@ body.resizing * {
     color: var(--color-primary-text);
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 
 #app-navigation-new button:hover {
@@ -67,12 +110,11 @@ body.resizing * {
     padding: 0;
     margin: 0;
     flex: 1;
-    transition: all 0.3s ease;
+    transition: var(--transition-standard);
 }
 
 .nav-entry {
     position: relative;
-    transition: all 0.3s ease;
 }
 
 .nav-entry a {
@@ -80,7 +122,6 @@ body.resizing * {
     padding: 12px 16px;
     color: var(--color-main-text);
     text-decoration: none;
-    transition: all 0.3s ease;
     border-left: 3px solid transparent;
 }
 
@@ -104,7 +145,6 @@ body.resizing * {
     min-height: 0;
     min-width: 0;
     width: 0; /* force flex item to respect container width */
-    transition: all 0.3s ease;
     z-index: 1;
     position: relative;
 }
@@ -152,11 +192,10 @@ body.resizing * {
 
 .upload-drop-zone {
     border: 2px dashed var(--color-border);
-    border-radius: 12px;
+    border-radius: var(--border-radius-xl);
     padding: 40px 20px;
     text-align: center;
     background: var(--color-main-background);
-    transition: all 0.3s ease;
     cursor: pointer;
 }
 
@@ -232,7 +271,6 @@ body.resizing * {
     font-size: 1em;
     background: var(--color-main-background);
     color: var(--color-main-text);
-    transition: all 0.3s ease;
     outline: none;
 }
 
@@ -270,7 +308,7 @@ body.resizing * {
     margin-bottom: 10px;
     background: var(--color-main-background);
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
     overflow: auto; /* container scrolls horizontally */
     box-sizing: border-box;
     scrollbar-gutter: stable; /* keeps layout stable with scrollbars */
@@ -296,12 +334,12 @@ body.resizing * {
 
 .ebooks-table-container::-webkit-scrollbar-track {
     background: var(--color-background-hover);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
 }
 
 .ebooks-table-container::-webkit-scrollbar-thumb {
     background: var(--color-border-dark);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
 }
 
 .ebooks-table-container::-webkit-scrollbar-thumb:hover {
@@ -322,7 +360,6 @@ body.resizing * {
 
 #load-more-btn {
     min-width: 150px;
-    transition: all 0.3s ease;
 }
 
 #load-more-btn:hover:not(:disabled) {
@@ -375,7 +412,6 @@ body.resizing * {
 .ebooks-table th.sortable {
     cursor: pointer;
     user-select: none;
-    transition: background-color 0.2s ease;
 }
 
 .ebooks-table th.sortable:hover {
@@ -470,7 +506,6 @@ body.resizing * {
 
 .book-row {
     border-bottom: 1px solid var(--color-border);
-    transition: background-color 0.2s ease;
 }
 
 .book-row:last-child {
@@ -482,18 +517,18 @@ body.resizing * {
 }
 
 .ebooks-table td {
-    padding: 8px;
+    padding: var(--padding-small);
     vertical-align: middle;
 }
 
 /* First column (icon) body cell padding */
 .ebooks-table td:first-child {
-    padding: 8px;
+    padding: var(--padding-small);
 }
 
 /* Last column (actions) body cell padding */
 .ebooks-table td:last-child {
-    padding: 8px;
+    padding: var(--padding-small);
 }
 
 /* Icon cell */
@@ -606,7 +641,7 @@ body.resizing * {
 .format-badge {
     display: inline-block;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     font-size: 0.7em;
     font-weight: 600;
     text-transform: uppercase;
@@ -619,17 +654,17 @@ body.resizing * {
 }
 
 .format-pdf {
-    background: #e74c3c;
+    background: var(--format-color-pdf);
     color: white;
 }
 
 .format-cbr {
-    background: #f39c12;
+    background: var(--format-color-cbr);
     color: white;
 }
 
 .format-mobi {
-    background: #9b59b6;
+    background: var(--format-color-mobi);
     color: white;
 }
 
@@ -731,10 +766,9 @@ body.resizing * {
 .action-btn {
     background: none;
     border: none;
-    padding: 8px;
+    padding: var(--padding-small);
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
+    border-radius: var(--border-radius-small);
     font-size: 14px;
     opacity: 0.7;
     display: flex;
@@ -788,7 +822,7 @@ body.resizing * {
     flex: 1;
     padding: 8px 12px;
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-main-background);
     color: var(--color-main-text);
     font-family: monospace;
@@ -803,10 +837,9 @@ body.resizing * {
 .copy-btn {
     padding: 8px 12px;
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-background-hover);
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 
 .copy-btn:hover {
@@ -843,7 +876,7 @@ body.resizing * {
     padding: 8px 12px;
     padding-right: 40px;
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-main-background);
     color: var(--color-main-text);
 }
@@ -873,14 +906,13 @@ body.resizing * {
 }
 
 .password-setting .btn {
-    padding: 8px 16px;
+    padding: var(--padding-button);
     border: 1px solid var(--color-primary);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-primary);
     color: var(--color-primary-text);
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s ease;
 }
 
 .password-setting .btn:hover {
@@ -902,7 +934,7 @@ body.resizing * {
 .password-status {
     font-size: 0.9em;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-background-hover);
     white-space: nowrap;
 }
@@ -947,7 +979,7 @@ body.resizing * {
     padding: 8px 12px;
     padding-right: 40px;
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-main-background);
     color: var(--color-main-text);
     position: relative;
@@ -961,12 +993,11 @@ body.resizing * {
 
 /* Button styles */
 .btn {
-    padding: 8px 16px;
+    padding: var(--padding-button);
     border: 1px solid;
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s ease;
     text-decoration: none;
     display: inline-block;
 }
@@ -1025,7 +1056,7 @@ body.resizing * {
     border: 1px solid var(--color-warning);
     color: white;
     padding: 6px 12px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     cursor: pointer;
     font-size: 0.9em;
     transition: all 0.2s ease;
@@ -1066,14 +1097,14 @@ body.resizing * {
 .sync-user-form {
     background: var(--color-background-hover);
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
     margin-top: 12px;
 }
 
 .sync-settings {
     background: var(--color-background-hover);
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
 }
 
 .form-row {
@@ -1087,6 +1118,7 @@ body.resizing * {
     color: var(--color-main-text);
 }
 
+/* Consolidated form input styles */
 .form-row input[type="text"],
 .form-row input[type="password"],
 .form-group input[type="text"],
@@ -1096,9 +1128,9 @@ body.resizing * {
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--padding-form-input);
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     background: var(--color-main-background);
     color: var(--color-main-text);
     box-sizing: border-box;
@@ -1256,14 +1288,14 @@ input:focus + .slider {
 .api-user-form {
     background: var(--color-background-hover);
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
     margin-top: 12px;
 }
 
 .api-settings {
     background: var(--color-background-hover);
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
 }
 
 .api-actions {
@@ -1297,7 +1329,7 @@ input:focus + .slider {
 
 .modal-content {
     background: var(--color-main-background);
-    border-radius: 12px;
+    border-radius: var(--border-radius-xl);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     width: 90%;
     max-width: 700px;
@@ -1339,7 +1371,7 @@ input:focus + .slider {
     color: var(--color-text-maxcontrast);
     cursor: pointer;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-small);
     transition: all 0.2s ease;
 }
 
@@ -1433,16 +1465,17 @@ input:focus + .slider {
     font-size: 0.95em;
 }
 
+/* Form inputs - enhanced styling for modal forms */
 .form-group input,
 .form-group select,
 .form-group textarea {
-    padding: 10px 12px;
+    padding: var(--padding-form-large);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: var(--border-radius-medium);
     background: var(--color-main-background);
     color: var(--color-main-text);
     font-size: 0.95em;
-    transition: border-color 0.2s ease;
+    transition: var(--transition-fast);
 }
 
 .form-group input:focus,
@@ -1461,7 +1494,7 @@ input:focus + .slider {
 
 .comic-metadata-fields {
     background: var(--color-background-hover);
-    border-radius: 8px;
+    border-radius: var(--border-radius-large);
     padding: 20px;
     margin: 20px 0;
 }
@@ -1562,7 +1595,7 @@ input:focus + .slider {
         width: 100%;
         padding-left: 0;
         padding-right: 0;
-        transition: all 0.3s ease;
+        transition: var(--transition-standard);
     }
     
     /* Remove horizontal padding completely for edge-to-edge table */
@@ -1582,13 +1615,13 @@ input:focus + .slider {
         max-width: none;
         position: relative;
         box-sizing: border-box;
-        transition: all 0.3s ease;
+        transition: var(--transition-standard);
     }
     
-    /* Header wrapper with 15px margin on tablet */
+    /* Header wrapper with margin on tablet */
     .header-wrapper {
         margin-left: 30px;
-        margin-right: 15px
+        margin-right: 15px;
     }
     
     /* Remove h2 from individual padding since it's in header-wrapper now */
@@ -1602,7 +1635,7 @@ input:focus + .slider {
     /* Search container: remove 80% width, use 15px margin from header-wrapper */
     .ebooks-search-container {
         margin: 0px 0px 5px 0px;
-        transition: all 0.3s ease;
+        transition: var(--transition-standard);
     }
     
     /* Ensure other connection sections have proper padding */
@@ -1641,11 +1674,7 @@ input:focus + .slider {
         border-bottom: none;
     }
     
-    /* Header wrapper with 15px margin on mobile */
-    .header-wrapper {
-        margin-left: 30px;
-        margin-right: 15px;
-    }
+    /* Header wrapper margin inherited from tablet breakpoint */
     
     /* Add padding back to content that needs it */
     .load-more-container,
@@ -1657,7 +1686,7 @@ input:focus + .slider {
     /* Search container: remove 80% width, use 15px margin from header-wrapper */
     .ebooks-search-container {
         margin: 0px 0px 5px 0px;
-        transition: all 0.3s ease;
+        transition: var(--transition-standard);
     }
     
     .connection-section {
@@ -1738,7 +1767,7 @@ input:focus + .slider {
 
 /* Nextcloud icon integration - using built-in icon classes */
 .copy-btn, .password-toggle {
-    padding: 8px;
+    padding: var(--padding-small);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     background: var(--color-background-hover);
