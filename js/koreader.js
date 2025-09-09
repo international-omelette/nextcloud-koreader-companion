@@ -14,9 +14,8 @@ $(document).ready(function() {
     initUploadModal();
     checkKoreaderPassword();
     initEventListeners();
-    initSearchFunctionality();
     initTableSorting();
-    initLoadMore();
+    initInfiniteScroll();
     initResponsiveHandling();
     initHamburgerMenu();
 });
@@ -409,75 +408,7 @@ function fallbackCopyToClipboard(text) {
 /**
  * Initialize search functionality for the books table
  */
-function initSearchFunctionality() {
-    const searchInput = document.getElementById('books-search');
-    const searchResultsInfo = document.getElementById('search-results-info');
-    const booksTable = document.querySelector('.ebooks-table tbody');
-    
-    if (!searchInput || !booksTable) {
-        return;
-    }
-    
-    let searchTimeout;
-    
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            performSearch(this.value.trim().toLowerCase());
-        }, 300);
-    });
-    
-    function performSearch(searchTerm) {
-        const bookRows = booksTable.querySelectorAll('.book-row');
-        let visibleCount = 0;
-        let totalCount = bookRows.length;
-        
-        bookRows.forEach(row => {
-            if (searchTerm === '') {
-                row.style.display = '';
-                visibleCount++;
-                return;
-            }
-            
-            const titleElement = row.querySelector('.book-title');
-            const authorElement = row.querySelector('.book-author');
-            
-            const title = titleElement ? titleElement.textContent.toLowerCase() : '';
-            const author = authorElement ? authorElement.textContent.toLowerCase() : '';
-            
-            const matchesTitle = title.includes(searchTerm);
-            const matchesAuthor = author.includes(searchTerm);
-            
-            if (matchesTitle || matchesAuthor) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
-            }
-        });
-        
-        updateSearchResultsInfo(searchTerm, visibleCount, totalCount);
-    }
-    
-    function updateSearchResultsInfo(searchTerm, visibleCount, totalCount) {
-        if (searchTerm === '') {
-            searchResultsInfo.style.display = 'none';
-            return;
-        }
-        
-        let message;
-        if (visibleCount === 0) {
-            message = t('koreader_companion', 'No books found matching "{searchTerm}"').replace('{searchTerm}', searchTerm);
-        } else if (visibleCount === totalCount) {
-            message = t('koreader_companion', 'Showing all {count} books').replace('{count}', totalCount);
-        } else {
-            message = t('koreader_companion', 'Showing {visible} of {total} books').replace('{visible}', visibleCount).replace('{total}', totalCount);
-        }
-        
-        searchResultsInfo.textContent = message;
-        searchResultsInfo.style.display = 'block';
-    }
-}
+// Search functionality is now handled by initInfiniteScroll()
 
 /**
  * Initialize table sorting functionality for all columns
@@ -615,60 +546,68 @@ function initTableSorting() {
     }
 }
 
-// Load More Button Implementation
-function initLoadMore() {
+// Infinite Scroll Implementation
+function initInfiniteScroll() {
     const tbody = $('.ebooks-table tbody');
     if (tbody.length === 0) {
         return;
     }
     
-    let currentPage = 1;
     let loading = false;
-    let hasMorePages = true;
-    const perPage = 20;
+    let currentPage = 2; // Start from page 2 since page 1 is already loaded by template
+    let searchQuery = '';
+    let hasMore = true;
+    const perPage = 50; // Configurable page size - default 50 books per page
     
-    // Add load more button
-    const loadMoreButton = $('<div class="load-more-container" style="text-align: center; margin: 20px 0;"><button id="load-more-btn" class="btn primary" style="padding: 12px 24px; font-size: 16px;">Load more...</button></div>');
+    // Remove any existing load more button
+    $('.load-more-container').remove();
     
-    // Insert after the table container
-    $('.ebooks-table-container').after(loadMoreButton);
+    // Add sentinel element after the table
+    const sentinel = $('<div id="scroll-sentinel" style="height: 1px; width: 100%;"></div>');
+    $('.ebooks-table-wrapper').after(sentinel);
     
-    // Load more button click handler
-    $('#load-more-btn').on('click', function() {
-        loadMoreBooks();
-    });
-    
-    // Check if we need to show/hide button initially
-    updateLoadMoreVisibility();
-    
-    function updateLoadMoreVisibility() {
-        if (hasMorePages) {
-            $('#load-more-btn').show();
-        } else {
-            $('#load-more-btn').hide();
+    // Create intersection observer for infinite scroll
+    const observer = new IntersectionObserver((entries) => {
+        console.log('Intersection Observer triggered:', entries[0].isIntersecting, 'loading:', loading, 'hasMore:', hasMore);
+        if (entries[0].isIntersecting && !loading && hasMore) {
+            console.log('Loading more books, currentPage:', currentPage);
+            loadMoreBooks();
         }
+    }, { rootMargin: '50px' });
+    
+    observer.observe(sentinel[0]);
+    
+    // Set up search input with server-side search
+    $('#books-search').off('input').on('input', debounce((e) => {
+        searchQuery = e.target.value.trim();
+        console.log('Search query changed:', searchQuery);
+        resetAndSearch();
+    }, 300));
+    
+    function resetAndSearch() {
+        console.log('Resetting search');
+        currentPage = 1;
+        hasMore = true;
+        $('.ebooks-table tbody').empty();
+        loadMoreBooks();
     }
     
     async function loadMoreBooks() {
-        if (loading || !hasMorePages) {
+        if (loading) {
+            console.log('Already loading, skipping');
             return;
         }
-        
         loading = true;
-        currentPage++;
-        
-        // Show loading state on button
-        const loadMoreBtn = $('#load-more-btn');
-        const originalText = loadMoreBtn.html();
-        loadMoreBtn.prop('disabled', true).html('Loading...');
+        console.log(`Loading page ${currentPage} with query: "${searchQuery}"`);
         
         try {
-            const url = OC.generateUrl('/apps/koreader_companion/') + `?page=${currentPage}&per_page=${perPage}`;
+            const url = OC.generateUrl('/apps/koreader_companion/') + 
+                       `?page=${currentPage}&q=${encodeURIComponent(searchQuery)}`;
+            console.log('Fetching:', url);
             
             const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
+                headers: { 
+                    'Accept': 'application/json', 
                     'X-Requested-With': 'XMLHttpRequest',
                     'requesttoken': OC.requestToken
                 }
@@ -679,40 +618,50 @@ function initLoadMore() {
             }
             
             const books = await response.json();
+            console.log('Received books:', books.length);
             
             if (!Array.isArray(books)) {
                 throw new Error('Invalid response format');
             }
             
             if (books.length === 0) {
-                hasMorePages = false;
-                loadMoreBtn.hide();
+                console.log('No more books available');
+                hasMore = false;
                 return;
             }
             
-            // Append new book rows to table
-            books.forEach((book) => {
-                const bookRow = createBookRow(book);
-                tbody.append(bookRow);
+            books.forEach(book => {
+                $('.ebooks-table tbody').append(createBookRow(book));
             });
             
+            currentPage++;
             // If we got fewer books than requested, we've reached the end
-            if (books.length < perPage) {
-                hasMorePages = false;
-                loadMoreBtn.hide();
-            } else {
-                loadMoreBtn.prop('disabled', false).html(originalText);
-            }
+            hasMore = books.length >= perPage;
+            console.log('Page loaded. Next page:', currentPage, 'hasMore:', hasMore);
             
         } catch (error) {
-            loadMoreBtn.html('Failed to load - Please refresh').addClass('danger');
-            hasMorePages = false;
+            console.error('Failed to load books:', error);
+            hasMore = false;
         } finally {
             loading = false;
         }
     }
     
-    function createBookRow(book) {
+    // Don't do initial load - page template already has first page books
+    // Only start infinite scroll after initial books are present
+    console.log('Infinite scroll initialized');
+}
+
+// Simple debounce utility
+function debounce(func, delay) {
+    let timeoutId;
+    return function (...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+    
+function createBookRow(book) {
         // Format year from publication_date
         let yearDisplay = '-';
         if (book.publication_date) {
@@ -833,7 +782,7 @@ function initLoadMore() {
         return row;
     }
     
-    function formatFileSize(bytes) {
+function formatFileSize(bytes) {
         if (bytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB'];
@@ -841,12 +790,11 @@ function initLoadMore() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
     
-    function escapeHtml(text) {
+function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-}
 
 // Edit metadata modal functionality
 function showEditMetadataModal(bookData) {

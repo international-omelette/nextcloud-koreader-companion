@@ -52,7 +52,8 @@ class PageController extends Controller {
      */
     public function index() {
         $page = max(1, (int)$this->request->getParam('page', 1));
-        $perPage = min(50, max(10, (int)$this->request->getParam('per_page', 20)));
+        $perPage = 50; // Fixed page size of 50 books
+        $query = $this->request->getParam('q', '');
         
         $user = $this->userSession->getUser();
         
@@ -62,8 +63,8 @@ class PageController extends Controller {
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            // Return JSON for AJAX requests
-            $books = $this->bookService->getBooks($page, $perPage);
+            // Return JSON for AJAX requests - use search method to handle both search and pagination
+            $books = $this->bookService->searchBooks($query, $page, $perPage);
             return new JSONResponse($books);
         }
         
