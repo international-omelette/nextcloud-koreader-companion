@@ -258,25 +258,53 @@ body.resizing * {
 }
 
 .search-wrapper {
-    position: relative;
+    display: flex;
+    align-items: center;
     width: 100%;
     margin: 0;
+    position: relative;
+    border: 2px solid var(--color-border-dark);
+    border-radius: var(--border-radius-medium);
+    background: var(--color-main-background);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-wrapper:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-element-light);
+}
+
+.search-icon {
+    color: var(--color-text-maxcontrast);
+    padding: 12px 15px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.search-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--color-border-dark);
+    flex-shrink: 0;
 }
 
 .search-input {
-    width: 100%;
-    padding: 12px 45px 12px 15px;
-    border: 2px solid var(--color-border);
-    border-radius: 25px;
+    flex: 1;
+    border: none !important;
+    background: transparent !important;
+    padding: 12px 15px;
     font-size: 1em;
-    background: var(--color-main-background);
     color: var(--color-main-text);
-    outline: none;
-}
-
-.search-input:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-element-light);
+    outline: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
 .search-input::placeholder {
@@ -284,15 +312,6 @@ body.resizing * {
     font-style: italic;
 }
 
-.search-icon {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-text-maxcontrast);
-    pointer-events: none;
-    font-size: 1.1em;
-}
 
 .search-results-info {
     text-align: center;
@@ -1506,6 +1525,15 @@ input:focus + .slider {
     font-weight: 600;
 }
 
+/* Hamburger menu vertical alignment - applies globally */
+#header .header-left #nextcloud,
+#header .menutoggle,
+.header .menutoggle,
+#appmenu,
+.icon-menu {
+    margin-top: 3px;
+}
+
 /* Upload Progress Styles */
 .upload-progress-item {
     display: flex;
@@ -1632,10 +1660,19 @@ input:focus + .slider {
         transition: padding 0.3s ease;
     }
     
-    /* Search container: remove 80% width, use 15px margin from header-wrapper */
+    /* Search container: provide better spacing */
     .ebooks-search-container {
-        margin: 0px 0px 5px 0px;
+        margin: 0px 0px 10px 0px;
         transition: var(--transition-standard);
+    }
+    
+    /* Reduce search padding on tablet */
+    .search-icon {
+        padding: 8px 12px;
+    }
+    
+    .search-input {
+        padding: 8px 12px;
     }
     
     /* Ensure other connection sections have proper padding */
@@ -1674,7 +1711,11 @@ input:focus + .slider {
         border-bottom: none;
     }
     
-    /* Header wrapper margin inherited from tablet breakpoint */
+    /* Inherit tablet margins completely - hamburger already accounted for */
+    .header-wrapper {
+        margin-left: 30px;
+        margin-right: 15px;
+    }
     
     /* Add padding back to content that needs it */
     .load-more-container,
@@ -1683,10 +1724,15 @@ input:focus + .slider {
         padding-right: 16px;
     }
     
-    /* Search container: remove 80% width, use 15px margin from header-wrapper */
-    .ebooks-search-container {
-        margin: 0px 0px 5px 0px;
-        transition: var(--transition-standard);
+    /* Search container inherits tablet margins - no override needed */
+    
+    /* Further reduce search padding on mobile */
+    .search-icon {
+        padding: 6px 8px;
+    }
+    
+    .search-input {
+        padding: 6px 8px;
     }
     
     .connection-section {
