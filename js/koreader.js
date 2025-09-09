@@ -568,9 +568,7 @@ function initInfiniteScroll() {
     
     // Create intersection observer for infinite scroll
     const observer = new IntersectionObserver((entries) => {
-        console.log('Intersection Observer triggered:', entries[0].isIntersecting, 'loading:', loading, 'hasMore:', hasMore);
         if (entries[0].isIntersecting && !loading && hasMore) {
-            console.log('Loading more books, currentPage:', currentPage);
             loadMoreBooks();
         }
     }, { rootMargin: '50px' });
@@ -580,12 +578,10 @@ function initInfiniteScroll() {
     // Set up search input with server-side search
     $('#books-search').off('input').on('input', debounce((e) => {
         searchQuery = e.target.value.trim();
-        console.log('Search query changed:', searchQuery);
         resetAndSearch();
     }, 300));
     
     function resetAndSearch() {
-        console.log('Resetting search');
         currentPage = 1;
         hasMore = true;
         $('.ebooks-table tbody').empty();
@@ -594,16 +590,13 @@ function initInfiniteScroll() {
     
     async function loadMoreBooks() {
         if (loading) {
-            console.log('Already loading, skipping');
             return;
         }
         loading = true;
-        console.log(`Loading page ${currentPage} with query: "${searchQuery}"`);
         
         try {
             const url = OC.generateUrl('/apps/koreader_companion/') + 
                        `?page=${currentPage}&q=${encodeURIComponent(searchQuery)}`;
-            console.log('Fetching:', url);
             
             const response = await fetch(url, {
                 headers: { 
@@ -618,14 +611,12 @@ function initInfiniteScroll() {
             }
             
             const books = await response.json();
-            console.log('Received books:', books.length);
             
             if (!Array.isArray(books)) {
                 throw new Error('Invalid response format');
             }
             
             if (books.length === 0) {
-                console.log('No more books available');
                 hasMore = false;
                 return;
             }
@@ -637,7 +628,6 @@ function initInfiniteScroll() {
             currentPage++;
             // If we got fewer books than requested, we've reached the end
             hasMore = books.length >= perPage;
-            console.log('Page loaded. Next page:', currentPage, 'hasMore:', hasMore);
             
         } catch (error) {
             console.error('Failed to load books:', error);
@@ -649,7 +639,6 @@ function initInfiniteScroll() {
     
     // Don't do initial load - page template already has first page books
     // Only start infinite scroll after initial books are present
-    console.log('Infinite scroll initialized');
 }
 
 // Simple debounce utility
@@ -924,7 +913,7 @@ function saveEditedMetadata(bookId) {
             try {
                 const response = JSON.parse(xhr.responseText);
                 if (response.success) {
-                    showNotification('Book metadata updated successfully', 'success');
+                    OC.Notification.showTemporary(t('koreader_companion', 'Book metadata updated successfully'));
                     hideEditMetadataModal();
                     // Refresh the books list
                     if (typeof loadBooks === 'function') {
@@ -933,14 +922,14 @@ function saveEditedMetadata(bookId) {
                         location.reload();
                     }
                 } else {
-                    showNotification(`Failed to update metadata: ${response.error}`, 'error');
+                    OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
                 }
             } catch (e) {
                 console.error('Parse error:', e);
-                showNotification('Failed to update metadata', 'error');
+                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata'));
             }
         } else {
-            showNotification(`Failed to update metadata (${xhr.status})`, 'error');
+            OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata ({status})', {status: xhr.status}));
         }
     };
     
@@ -949,7 +938,7 @@ function saveEditedMetadata(bookId) {
             saveButton.disabled = false;
             saveButton.textContent = 'Save Changes';
         }
-        showNotification('Network error updating metadata', 'error');
+        OC.Notification.showTemporary(t('koreader_companion', 'Network error updating metadata'));
     };
     
     xhr.send(formData);
@@ -1068,13 +1057,13 @@ function toggleNavigation(e) {
     if (navigationOpen) {
         // Opening - force immediate start of transition
         nav.style.transition = 'none';
-        nav.offsetHeight; // Force reflow to ensure no transition
+        nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
         body.classList.add('navigation-open');
     } else {
         // Closing - force immediate start of transition
         nav.style.transition = 'none';
-        nav.offsetHeight; // Force reflow
+        nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
         body.classList.remove('navigation-open');
     }
@@ -1087,7 +1076,7 @@ function closeNavigation() {
     if (body.classList.contains('navigation-open')) {
         // Force immediate start of close transition
         nav.style.transition = 'none';
-        nav.offsetHeight; // Force reflow
+        nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
         
         // Close navigation

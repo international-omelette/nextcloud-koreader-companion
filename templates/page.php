@@ -172,8 +172,8 @@ script('koreader_companion', 'upload');
                                             <?php endif; ?>
                                         </td>
                                         <td class="book-actions-cell">
-                                            <button class="action-btn edit-book-btn" 
-                                                    data-path="<?php p($book['path']); ?>"
+                                            <button class="action-btn edit-metadata-btn" 
+                                                    data-book-id="<?php p(base64_encode($book['path'])); ?>"
                                                     data-title="<?php p($book['title']); ?>"
                                                     data-author="<?php p($book['author']); ?>"
                                                     data-format="<?php p($book['format']); ?>"
@@ -190,6 +190,8 @@ script('koreader_companion', 'upload');
                                                     ?>"
                                                     data-language="<?php p($book['language'] ?? ''); ?>"
                                                     data-publisher="<?php p($book['publisher'] ?? ''); ?>"
+                                                    data-description="<?php p($book['description'] ?? ''); ?>"
+                                                    data-tags="<?php p($book['tags'] ?? ''); ?>"
                                                     title="<?php p($l->t('Edit metadata')); ?>"><span class="icon icon-edit"></span></button>
                                         </td>
                                     </tr>

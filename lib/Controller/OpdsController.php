@@ -33,7 +33,6 @@ class OpdsController extends Controller {
         
         $totalCount = $this->bookService->getTotalBookCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -81,7 +80,6 @@ class OpdsController extends Controller {
         
         $totalCount = $this->bookService->getSearchResultCount($query);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount, $query);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -132,7 +130,6 @@ class OpdsController extends Controller {
         
         $totalPages = ceil($totalCount / $perPage);
         
-        // Build current URL for self link
         $currentUrl = $baseUrl;
         $urlParams = [];
         if ($page > 1) {
@@ -164,16 +161,13 @@ class OpdsController extends Controller {
         href="' . $opensearchUrl . '"/>
 ';
 
-        // Add pagination links
         if ($totalPages > 1) {
-            // First page link
             if ($page > 1) {
                 $firstUrl = empty($searchQuery) ? $baseUrl : $searchUrl . '?q=' . urlencode($searchQuery);
                 $xml .= '  <link rel="first" type="application/atom+xml;profile=opds-catalog" 
         href="' . htmlspecialchars($firstUrl) . '"/>
 ';
                 
-                // Previous page link
                 $prevPage = $page - 1;
                 $prevParams = [];
                 if ($prevPage > 1) {
@@ -191,7 +185,6 @@ class OpdsController extends Controller {
 ';
             }
             
-            // Next page link
             if ($page < $totalPages) {
                 $nextPage = $page + 1;
                 $nextParams = ['page' => $nextPage];
@@ -203,7 +196,6 @@ class OpdsController extends Controller {
         href="' . htmlspecialchars($nextUrl) . '"/>
 ';
                 
-                // Last page link
                 $lastParams = ['page' => $totalPages];
                 if (!empty($searchQuery)) {
                     $lastParams['q'] = $searchQuery;
@@ -297,12 +289,10 @@ class OpdsController extends Controller {
     private function validatePagination($page, $perPage, $totalCount, $searchQuery = '') {
         $totalPages = ceil($totalCount / $perPage);
         
-        // If no results, return first page
         if ($totalCount === 0) {
             return null;
         }
         
-        // If requesting a page beyond the last page, redirect to last page
         if ($page > $totalPages && $totalPages > 0) {
             $urlGenerator = \OC::$server->getURLGenerator();
             $baseRoute = empty($searchQuery) ? 'koreader_companion.opds.index' : 'koreader_companion.opds.search';
@@ -336,7 +326,6 @@ class OpdsController extends Controller {
         
         $totalPages = ceil($totalCount / $perPage);
         
-        // Build current URL for self link
         $currentUrl = $baseUrl;
         $urlParams = [];
         if ($page > 1) {
@@ -398,9 +387,7 @@ class OpdsController extends Controller {
         href="' . htmlspecialchars($baseUrl) . '?sort=title"/>
 ';
 
-        // Add pagination links
         if ($totalPages > 1) {
-            // First page link
             if ($page > 1) {
                 $firstParams = [];
                 if ($sort !== 'title') {
@@ -414,7 +401,6 @@ class OpdsController extends Controller {
         href="' . htmlspecialchars($firstUrl) . '"/>
 ';
                 
-                // Previous page link
                 $prevPage = $page - 1;
                 $prevParams = [];
                 if ($prevPage > 1) {
@@ -432,7 +418,6 @@ class OpdsController extends Controller {
 ';
             }
             
-            // Next page link
             if ($page < $totalPages) {
                 $nextPage = $page + 1;
                 $nextParams = ['page' => $nextPage];
@@ -444,7 +429,6 @@ class OpdsController extends Controller {
         href="' . htmlspecialchars($nextUrl) . '"/>
 ';
                 
-                // Last page link
                 $lastParams = ['page' => $totalPages];
                 if ($sort !== 'title') {
                     $lastParams['sort'] = $sort;
@@ -470,7 +454,6 @@ class OpdsController extends Controller {
         return $xml;
     }
 
-    // ====================== FACETED BROWSING ENDPOINTS ======================
 
     /**
      * @NoAdminRequired
@@ -483,7 +466,6 @@ class OpdsController extends Controller {
         $authors = $this->bookService->getAuthors($page, $perPage);
         $totalCount = $this->bookService->getAuthorsCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -509,7 +491,6 @@ class OpdsController extends Controller {
         $books = $this->bookService->getBooksByAuthor($author, $page, $perPage, $sort);
         $totalCount = $this->bookService->getBooksByAuthorCount($author);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -534,7 +515,6 @@ class OpdsController extends Controller {
         $series = $this->bookService->getSeries($page, $perPage);
         $totalCount = $this->bookService->getSeriesCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -559,7 +539,6 @@ class OpdsController extends Controller {
         $books = $this->bookService->getBooksBySeries($seriesName, $page, $perPage);
         $totalCount = $this->bookService->getBooksBySeriesCount($seriesName);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -584,7 +563,6 @@ class OpdsController extends Controller {
         $genres = $this->bookService->getGenres($page, $perPage);
         $totalCount = $this->bookService->getGenresCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -610,7 +588,6 @@ class OpdsController extends Controller {
         $books = $this->bookService->getBooksByGenre($genre, $page, $perPage, $sort);
         $totalCount = $this->bookService->getBooksByGenreCount($genre);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -635,7 +612,6 @@ class OpdsController extends Controller {
         $formats = $this->bookService->getFormats($page, $perPage);
         $totalCount = $this->bookService->getFormatsCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -661,7 +637,6 @@ class OpdsController extends Controller {
         $books = $this->bookService->getBooksByFormat($format, $page, $perPage, $sort);
         $totalCount = $this->bookService->getBooksByFormatCount($format);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -686,7 +661,6 @@ class OpdsController extends Controller {
         $languages = $this->bookService->getLanguages($page, $perPage);
         $totalCount = $this->bookService->getLanguagesCount();
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -712,7 +686,6 @@ class OpdsController extends Controller {
         $books = $this->bookService->getBooksByLanguage($language, $page, $perPage, $sort);
         $totalCount = $this->bookService->getBooksByLanguageCount($language);
         
-        // Validate pagination parameters
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
@@ -726,7 +699,6 @@ class OpdsController extends Controller {
         return $response;
     }
 
-    // ====================== FACETED BROWSING XML GENERATORS ======================
 
     private function generateAuthorsNavigationXml($authors, $page, $perPage, $totalCount) {
         $baseUrl = $this->getBaseUrl();
@@ -744,7 +716,6 @@ class OpdsController extends Controller {
   <link rel="up" type="application/atom+xml;profile=opds-catalog" href="' . htmlspecialchars($baseUrl) . '"/>
 ';
 
-        // Add pagination if needed
         $this->addPaginationLinks($xml, $page, $perPage, $totalCount, $baseUrl . '/authors');
 
         foreach ($authors as $author) {
@@ -786,7 +757,6 @@ class OpdsController extends Controller {
   <link rel="up" type="application/atom+xml;profile=opds-catalog" href="' . htmlspecialchars($baseUrl) . '"/>
 ';
 
-        // Add pagination if needed
         $this->addPaginationLinks($xml, $page, $perPage, $totalCount, $baseUrl . '/series');
 
         foreach ($series as $seriesItem) {
@@ -828,7 +798,6 @@ class OpdsController extends Controller {
   <link rel="up" type="application/atom+xml;profile=opds-catalog" href="' . htmlspecialchars($baseUrl) . '"/>
 ';
 
-        // Add pagination if needed
         $this->addPaginationLinks($xml, $page, $perPage, $totalCount, $baseUrl . '/genres');
 
         foreach ($genres as $genre) {
@@ -870,7 +839,6 @@ class OpdsController extends Controller {
   <link rel="up" type="application/atom+xml;profile=opds-catalog" href="' . htmlspecialchars($baseUrl) . '"/>
 ';
 
-        // Add pagination if needed
         $this->addPaginationLinks($xml, $page, $perPage, $totalCount, $baseUrl . '/formats');
 
         foreach ($formats as $format) {
@@ -912,7 +880,6 @@ class OpdsController extends Controller {
   <link rel="up" type="application/atom+xml;profile=opds-catalog" href="' . htmlspecialchars($baseUrl) . '"/>
 ';
 
-        // Add pagination if needed
         $this->addPaginationLinks($xml, $page, $perPage, $totalCount, $baseUrl . '/languages');
 
         foreach ($languages as $language) {
@@ -945,13 +912,11 @@ class OpdsController extends Controller {
         $totalPages = ceil($totalCount / $perPage);
         
         if ($totalPages > 1) {
-            // First page link
             if ($page > 1) {
                 $xml .= '  <link rel="first" type="application/atom+xml;profile=opds-catalog" 
         href="' . htmlspecialchars($baseUrl) . '"/>
 ';
                 
-                // Previous page link
                 $prevPage = $page - 1;
                 $prevUrl = $baseUrl;
                 if ($prevPage > 1) {
@@ -962,7 +927,6 @@ class OpdsController extends Controller {
 ';
             }
             
-            // Next page link
             if ($page < $totalPages) {
                 $nextPage = $page + 1;
                 $nextUrl = $baseUrl . '?page=' . $nextPage;
@@ -970,7 +934,6 @@ class OpdsController extends Controller {
         href="' . htmlspecialchars($nextUrl) . '"/>
 ';
                 
-                // Last page link
                 $lastUrl = $baseUrl . '?page=' . $totalPages;
                 $xml .= '  <link rel="last" type="application/atom+xml;profile=opds-catalog" 
         href="' . htmlspecialchars($lastUrl) . '"/>

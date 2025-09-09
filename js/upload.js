@@ -7,7 +7,6 @@
     let pendingFiles = [];
     let currentFileIndex = 0;
 
-    // DOM elements
     const dropZone = document.getElementById('upload-drop-zone');
     const fileInput = document.getElementById('file-input');
     const metadataModal = document.getElementById('metadata-modal');
@@ -16,7 +15,6 @@
     const bookFormatSelect = document.getElementById('book-format');
     const comicFields = document.getElementById('comic-fields');
 
-    // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         initializeUpload();
         initializeModal();
@@ -26,18 +24,14 @@
     function initializeUpload() {
         if (!dropZone || !fileInput) return;
 
-        // File input change handler
         fileInput.addEventListener('change', handleFileSelect);
 
-        // Choose files button
         const chooseFilesBtn = document.getElementById('choose-files-btn');
         if (chooseFilesBtn) {
             chooseFilesBtn.addEventListener('click', () => fileInput.click());
         }
 
-        // Drag and drop handlers
         dropZone.addEventListener('click', (e) => {
-            // Only trigger file input if clicking on empty area, not the button
             if (e.target === dropZone || e.target.closest('.upload-icon, h3, p')) {
                 fileInput.click();
             }
@@ -46,7 +40,6 @@
         dropZone.addEventListener('dragleave', handleDragLeave);
         dropZone.addEventListener('drop', handleDrop);
 
-        // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
             document.body.addEventListener(eventName, preventDefaults, false);
@@ -56,18 +49,15 @@
     function initializeModal() {
         if (!metadataModal) return;
 
-        // Format selection handler - show/hide comic fields
         if (bookFormatSelect) {
             bookFormatSelect.addEventListener('change', toggleComicFields);
         }
 
-        // Modal close handlers
         const closeModal = document.getElementById('close-modal');
         const cancelButton = document.getElementById('cancel-metadata');
         const closeUploadModal = document.getElementById('close-upload-modal');
         
         if (closeModal) closeModal.addEventListener('click', function() {
-            // Check if we're in edit mode or upload mode
             if (window.hideEditMetadataModal && document.getElementById('delete-metadata').style.display !== 'none') {
                 window.hideEditMetadataModal();
             } else {
@@ -75,7 +65,6 @@
             }
         });
         if (cancelButton) cancelButton.addEventListener('click', function() {
-            // Check if we're in edit mode or upload mode
             if (window.hideEditMetadataModal && document.getElementById('delete-metadata').style.display !== 'none') {
                 window.hideEditMetadataModal();
             } else {
@@ -84,7 +73,6 @@
         });
         if (closeUploadModal) closeUploadModal.addEventListener('click', hideUploadProgressModal);
         
-        // Save button handler
         const saveButton = document.getElementById('save-metadata');
         if (saveButton) saveButton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -92,7 +80,6 @@
             saveMetadata();
         });
 
-        // Delete button handler
         const deleteButton = document.getElementById('delete-metadata');
         if (deleteButton) deleteButton.addEventListener('click', (e) => {
             e.preventDefault();

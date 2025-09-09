@@ -57,26 +57,21 @@ class PageController extends Controller {
         
         $user = $this->userSession->getUser();
         
-        // Check if this is an AJAX request for pagination
         $acceptHeader = $this->request->getHeader('Accept');
         $isAjax = (strpos($acceptHeader, 'application/json') !== false) || 
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            // Return JSON for AJAX requests - use search method to handle both search and pagination
             $books = $this->bookService->searchBooks($query, $page, $perPage);
             return new JSONResponse($books);
         }
         
-        // For first page load, get initial books with pagination
         $books = $this->bookService->getBooks($page, $perPage);
         
-        // Generate connection information
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
         $opdsUrl = $baseUrl . '/apps/koreader_companion/opds';
         $koreaderSyncUrl = $baseUrl . '/apps/koreader_companion/sync';
         
-        // Check if user has KOReader sync password set
         $hasKoreaderPassword = false;
         if ($user) {
             $hasKoreaderPassword = !empty($this->config->getUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', ''));

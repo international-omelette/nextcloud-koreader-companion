@@ -1,6 +1,4 @@
-/* Let Nextcloud handle its own layout - no overrides */
 
-/* CSS Custom Properties for consistent styling */
 :root {
     --transition-standard: all 0.3s ease;
     --transition-fast: all 0.2s ease;
@@ -17,7 +15,6 @@
     --format-color-mobi: #9b59b6;
 }
 
-/* Universal transition system for interactive elements */
 button,
 input,
 select,
@@ -31,7 +28,6 @@ a,
     transition: var(--transition-fast);
 }
 
-/* Specific transition overrides for complex animations */
 .content-section {
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
@@ -44,19 +40,16 @@ a,
     transition: var(--transition-standard);
 }
 
-/* Prevent transition artifacts during window resize */
 body.resizing * {
     transition: none !important;
 }
 
-/* Fix flex layout constraints for proper scrolling */
 #app-content, .app-content {
     display: flex !important;
     flex-direction: column !important;
     min-height: 0 !important;
 }
 
-/* App container - Nextcloud side pane layout */
 #app {
     display: flex;
     height: 100%;
@@ -66,7 +59,6 @@ body.resizing * {
     min-width: 0;
 }
 
-/* Navigation sidebar */
 #app-navigation {
     width: 250px;
     background: var(--color-main-background);
@@ -79,7 +71,6 @@ body.resizing * {
     position: relative;
 }
 
-/* Primary action button */
 #app-navigation-new {
     padding: 12px;
     border-bottom: 1px solid var(--color-border);
@@ -104,7 +95,6 @@ body.resizing * {
     filter: invert(1);
 }
 
-/* Navigation menu */
 #app-navigation ul {
     list-style: none;
     padding: 0;
@@ -136,7 +126,6 @@ body.resizing * {
     font-weight: 500;
 }
 
-/* Content area */
 #app-content {
     flex: 1;
     overflow: hidden;
@@ -149,7 +138,6 @@ body.resizing * {
     position: relative;
 }
 
-/* Content sections */
 .content-section {
     display: none;
     padding: 15px;
@@ -171,9 +159,7 @@ body.resizing * {
     transform: translateY(0);
 }
 
-/* Header wrapper - no styling on desktop, margin on mobile/tablet */
 .header-wrapper {
-    /* No styles on desktop */
 }
 
 .content-section h2 {
@@ -183,9 +169,7 @@ body.resizing * {
     color: var(--color-main-text);
 }
 
-/* Remove old header styles as we now use sections */
 
-/* Upload Area Styles (now in modal) */
 .ebooks-upload-area {
     margin: 0;
 }
@@ -242,7 +226,6 @@ body.resizing * {
     height: 64px;
     margin: 0 auto 20px;
     opacity: 0.3;
-    /* Use Nextcloud's built-in icon system */
 }
 
 .ebooks-empty h2 {
@@ -251,7 +234,6 @@ body.resizing * {
     margin: 0 0 10px 0;
 }
 
-/* Search Bar Styles */
 .ebooks-search-container {
     margin: 10px 0;
     flex-shrink: 0; /* Don't allow search bar to shrink */
@@ -321,7 +303,6 @@ body.resizing * {
     font-style: italic;
 }
 
-/* Table Layout */
 .ebooks-table-container {
     margin-top: 10px;
     margin-bottom: 10px;
@@ -332,7 +313,6 @@ body.resizing * {
     box-sizing: border-box;
     scrollbar-gutter: stable; /* keeps layout stable with scrollbars */
     position: relative;
-    /* Constrain width to parent and enable horizontal scrolling */
     width: 100%;
     max-width: 100%;
     flex: 0 1 auto;
@@ -369,7 +349,6 @@ body.resizing * {
     background: var(--color-background-hover);
 }
 
-/* Load More Button */
 .load-more-container {
     margin: 5px 0 50px 0;
     text-align: center;
@@ -417,17 +396,14 @@ body.resizing * {
     position: relative;
 }
 
-/* First column (icon) header padding */
 .ebooks-table th:first-child {
     padding: 12px 8px 12px 0;
 }
 
-/* Last column (actions) header padding */
 .ebooks-table th:last-child {
     padding: 12px 8px;
 }
 
-/* Sortable header styles */
 .ebooks-table th.sortable {
     cursor: pointer;
     user-select: none;
@@ -540,17 +516,14 @@ body.resizing * {
     vertical-align: middle;
 }
 
-/* First column (icon) body cell padding */
 .ebooks-table td:first-child {
     padding: var(--padding-small);
 }
 
-/* Last column (actions) body cell padding */
 .ebooks-table td:last-child {
     padding: var(--padding-small);
 }
 
-/* Icon cell */
 .book-icon-cell {
     text-align: center;
     width: 40px;
@@ -561,7 +534,6 @@ body.resizing * {
     opacity: 0.8;
 }
 
-/* Title cell */
 .book-title-cell {
     min-width: 200px;
     max-width: 350px;
@@ -603,7 +575,6 @@ body.resizing * {
     font-weight: 500;
 }
 
-/* Author cell */
 .book-author-cell {
     width: 150px;
 }
@@ -615,7 +586,6 @@ body.resizing * {
     text-overflow: ellipsis;
 }
 
-/* Year cell */
 .book-year-cell {
     text-align: center;
     width: 60px;
@@ -626,7 +596,6 @@ body.resizing * {
     font-size: 0.9em;
 }
 
-/* Language cell */
 .book-language-cell {
     text-align: center;
     width: 80px;
@@ -638,7 +607,6 @@ body.resizing * {
     text-transform: uppercase;
 }
 
-/* Publisher cell */
 .book-publisher-cell {
     width: 120px;
 }
@@ -651,7 +619,6 @@ body.resizing * {
     font-size: 0.9em;
 }
 
-/* Format cell */
 .book-format-cell {
     text-align: center;
     width: 70px;
@@ -687,7 +654,6 @@ body.resizing * {
     color: white;
 }
 
-/* Size cell */
 .book-size-cell {
     width: 80px;
     text-align: right;
@@ -698,7 +664,6 @@ body.resizing * {
     font-size: 0.85em;
 }
 
-/* Progress cell */
 .book-progress-cell {
     width: 100px;
     text-align: center;
@@ -760,7 +725,6 @@ body.resizing * {
     font-size: 0.85em;
 }
 
-/* Last Sync cell */
 .book-last-sync-cell {
     width: 100px;
     text-align: center;
@@ -776,7 +740,6 @@ body.resizing * {
     font-size: 0.85em;
 }
 
-/* Actions cell */
 .book-actions-cell {
     width: 56px;
     text-align: center;
@@ -802,7 +765,6 @@ body.resizing * {
     opacity: 1;
 }
 
-/* Connection sections (now distributed across panes) */
 
 .connection-section {
     margin-bottom: 24px;
@@ -968,7 +930,6 @@ body.resizing * {
     color: var(--color-text-maxcontrast);
 }
 
-/* Form help text */
 .form-help {
     display: block;
     font-size: 0.85em;
@@ -977,14 +938,12 @@ body.resizing * {
     font-style: italic;
 }
 
-/* Readonly input styling */
 .readonly-input {
     background: var(--color-background-hover) !important;
     cursor: default !important;
     color: var(--color-text-maxcontrast) !important;
 }
 
-/* Password display group */
 .password-display-group {
     display: flex;
     align-items: center;
@@ -1010,7 +969,6 @@ body.resizing * {
     z-index: 2;
 }
 
-/* Button styles */
 .btn {
     padding: var(--padding-button);
     border: 1px solid;
@@ -1086,7 +1044,6 @@ body.resizing * {
     border-color: var(--color-warning-hover);
 }
 
-/* Form actions */
 .form-actions {
     display: flex;
     gap: 8px;
@@ -1094,7 +1051,6 @@ body.resizing * {
     flex-wrap: wrap;
 }
 
-/* Sync actions */
 .sync-actions {
     display: flex;
     justify-content: space-between;
@@ -1112,7 +1068,6 @@ body.resizing * {
     font-weight: 500;
 }
 
-/* Sync User Management Styles */
 .sync-user-form {
     background: var(--color-background-hover);
     padding: 16px;
@@ -1137,7 +1092,6 @@ body.resizing * {
     color: var(--color-main-text);
 }
 
-/* Consolidated form input styles */
 .form-row input[type="text"],
 .form-row input[type="password"],
 .form-group input[type="text"],
@@ -1170,7 +1124,6 @@ body.resizing * {
     cursor: not-allowed;
 }
 
-/* Reading Progress Styles */
 .book-progress {
     margin-top: 12px;
     padding-top: 8px;
@@ -1208,7 +1161,6 @@ body.resizing * {
     max-width: 100px;
 }
 
-/* API Access Controls Styles */
 .api-access-controls {
     margin-top: 20px;
     padding-top: 16px;
@@ -1249,7 +1201,6 @@ body.resizing * {
     font-size: 0.85em;
 }
 
-/* Toggle Switch Styles */
 .switch {
     position: relative;
     display: inline-block;
@@ -1303,7 +1254,6 @@ input:focus + .slider {
     box-shadow: 0 0 0 2px var(--color-primary-light);
 }
 
-/* API User Management Styles */
 .api-user-form {
     background: var(--color-background-hover);
     padding: 16px;
@@ -1332,7 +1282,6 @@ input:focus + .slider {
     font-size: 0.9em;
 }
 
-/* Modal Styles */
 .modal {
     position: fixed;
     z-index: 9999;
@@ -1417,7 +1366,6 @@ input:focus + .slider {
     gap: 12px;
 }
 
-/* Form Styles */
 .form-section {
     margin-bottom: 24px;
     padding-bottom: 20px;
@@ -1465,7 +1413,6 @@ input:focus + .slider {
     flex: 0 0 80px;
 }
 
-/* Legacy form-grid support for backwards compatibility */
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1484,7 +1431,6 @@ input:focus + .slider {
     font-size: 0.95em;
 }
 
-/* Form inputs - enhanced styling for modal forms */
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -1525,7 +1471,6 @@ input:focus + .slider {
     font-weight: 600;
 }
 
-/* Hamburger menu vertical alignment - applies globally */
 #header .header-left #nextcloud,
 #header .menutoggle,
 .header .menutoggle,
@@ -1534,7 +1479,6 @@ input:focus + .slider {
     margin-top: 3px;
 }
 
-/* Upload Progress Styles */
 .upload-progress-item {
     display: flex;
     align-items: center;
@@ -1583,9 +1527,7 @@ input:focus + .slider {
     transition: width 0.3s ease;
 }
 
-/* Navigation collapsed breakpoint - synchronized with Nextcloud's hamburger menu at 1024px */
 @media (max-width: 1024px) {
-    /* Tablet responsive adjustments - merged with navigation breakpoint */
     .ebooks-table-container {
         margin-left: 0;
         margin-right: 0;
@@ -1594,7 +1536,6 @@ input:focus + .slider {
         border-radius: 8px 0 0 8px;
     }
     
-    /* Hide the navigation sidebar by default using transform for better performance */
     #app-navigation {
         position: fixed;
         left: 0;
@@ -1612,12 +1553,10 @@ input:focus + .slider {
         overflow-y: auto;
     }
     
-    /* Show navigation with single state class */
     body.navigation-open #app-navigation {
         transform: translateX(0);
     }
     
-    /* Ensure content area uses the full width when navigation is hidden */
     #app-content {
         flex: 1;
         width: 100%;
@@ -1626,13 +1565,11 @@ input:focus + .slider {
         transition: var(--transition-standard);
     }
     
-    /* Remove horizontal padding completely for edge-to-edge table */
     .content-section {
         padding: 5px 0 !important;
         transition: padding 0.3s ease;
     }
     
-    /* Table container spans full width edge-to-edge - simplified approach */
     .ebooks-table-container {
         margin-left: 0;
         margin-right: 0;
@@ -1646,13 +1583,11 @@ input:focus + .slider {
         transition: var(--transition-standard);
     }
     
-    /* Header wrapper with margin on tablet */
     .header-wrapper {
         margin-left: 30px;
         margin-right: 15px;
     }
     
-    /* Remove h2 from individual padding since it's in header-wrapper now */
     .load-more-container,
     .ebooks-empty {
         padding-left: 12px;
@@ -1660,13 +1595,11 @@ input:focus + .slider {
         transition: padding 0.3s ease;
     }
     
-    /* Search container: provide better spacing */
     .ebooks-search-container {
         margin: 0px 0px 10px 0px;
         transition: var(--transition-standard);
     }
     
-    /* Reduce search padding on tablet */
     .search-icon {
         padding: 8px 12px;
     }
@@ -1675,7 +1608,6 @@ input:focus + .slider {
         padding: 8px 12px;
     }
     
-    /* Ensure other connection sections have proper padding */
     .connection-section {
         padding-left: 12px;
         padding-right: 12px;
@@ -1683,7 +1615,6 @@ input:focus + .slider {
     }
 }
 
-/* Mobile responsive navigation - minimal approach */
 @media (max-width: 768px) {
     #app {
         flex-direction: column;
@@ -1711,22 +1642,18 @@ input:focus + .slider {
         border-bottom: none;
     }
     
-    /* Inherit tablet margins completely - hamburger already accounted for */
     .header-wrapper {
         margin-left: 30px;
         margin-right: 15px;
     }
     
-    /* Add padding back to content that needs it */
     .load-more-container,
     .ebooks-empty {
         padding-left: 16px;
         padding-right: 16px;
     }
     
-    /* Search container inherits tablet margins - no override needed */
     
-    /* Further reduce search padding on mobile */
     .search-icon {
         padding: 6px 8px;
     }
@@ -1759,7 +1686,6 @@ input:focus + .slider {
         align-self: flex-start;
     }
     
-    /* Mobile form layout */
     .form-row {
         flex-direction: column;
         gap: 12px;
@@ -1781,7 +1707,6 @@ input:focus + .slider {
         padding-right: 20px;
     }
     
-    /* Mobile table adjustments - edge to edge */
     .ebooks-table-container {
         margin: 0;
         margin-bottom: 80px;
@@ -1811,7 +1736,6 @@ input:focus + .slider {
     }
 }
 
-/* Nextcloud icon integration - using built-in icon classes */
 .copy-btn, .password-toggle {
     padding: var(--padding-small);
     border: 1px solid var(--color-border);
