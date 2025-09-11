@@ -10,23 +10,73 @@ use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\IRequest;
 use OCP\IConfig;
+use OCP\IUserSession;
+use OCP\IUserManager;
 
 class OpdsController extends Controller {
 
     private $bookService;
     private $config;
+    private $userSession;
+    private $userManager;
 
-    public function __construct(IRequest $request, $appName, BookService $bookService, IConfig $config) {
+    public function __construct(IRequest $request, $appName, BookService $bookService, IConfig $config, IUserSession $userSession, IUserManager $userManager) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
         $this->config = $config;
+        $this->userSession = $userSession;
+        $this->userManager = $userManager;
+    }
+
+    /**
+     * Authenticate user using HTTP Basic Auth
+     * @return bool True if authenticated, false otherwise
+     */
+    private function authenticateBasicAuth(): bool {
+        $authHeader = $this->request->getHeader('Authorization');
+        
+        if (!$authHeader || !str_starts_with($authHeader, 'Basic ')) {
+            return false;
+        }
+        
+        $credentials = base64_decode(substr($authHeader, 6));
+        $parts = explode(':', $credentials, 2);
+        
+        if (count($parts) !== 2) {
+            return false;
+        }
+        
+        [$username, $password] = $parts;
+        
+        // Check if user exists in Nextcloud
+        $user = $this->userManager->get($username);
+        if (!$user) {
+            return false;
+        }
+        
+        // Verify password using Nextcloud's user manager
+        if (!$this->userManager->checkPassword($username, $password)) {
+            return false;
+        }
+        
+        // Set authenticated user in session for BookService context
+        $this->userSession->setUser($user);
+        
+        return true;
     }
 
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function index() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
         $sort = $this->request->getParam('sort', 'title');
@@ -49,8 +99,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function opensearch() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $searchUrl = $this->getSearchUrl();
         $baseUrl = $this->getBaseUrl();
         
@@ -72,8 +129,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function search() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $query = $this->request->getParam('q', '');
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
@@ -97,8 +161,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function download($id, $format) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $book = $this->bookService->getBookById($id);
         
         if (!$book) {
@@ -111,8 +182,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function thumbnail($id) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $book = $this->bookService->getBookById($id);
         
         if (!$book) {
@@ -458,8 +536,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function authors() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
@@ -481,8 +566,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function authorBooks($author) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $author = urldecode($author);
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
@@ -507,8 +599,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function series() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
@@ -530,8 +629,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function seriesBooks($seriesName) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $seriesName = urldecode($seriesName);
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
@@ -555,8 +661,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function genres() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
@@ -578,8 +691,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function genreBooks($genre) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $genre = urldecode($genre);
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
@@ -604,8 +724,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function formats() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
@@ -627,8 +754,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function formatBooks($format) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $format = urldecode($format);
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
@@ -653,8 +787,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function languages() {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
@@ -676,8 +817,15 @@ class OpdsController extends Controller {
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
+     * @PublicPage
      */
     public function languageBooks($language) {
+        if (!$this->authenticateBasicAuth()) {
+            $response = new DataResponse(['error' => 'Unauthorized'], 401);
+            $response->addHeader('WWW-Authenticate', 'Basic realm="Nextcloud OPDS"');
+            return $response;
+        }
+        
         $language = urldecode($language);
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
