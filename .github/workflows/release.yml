@@ -1,0 +1,94 @@
+name: Build and publish app release
+
+on:
+  push:
+    branches: [main, master]
+  release:
+    types: [published]
+
+env:
+  APP_NAME: koreader_companion
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+      
+      - name: Determine Version & Create Release
+        if: github.event_name == 'push'
+        id: version
+        uses: paulhatch/semantic-version@a8f8f59fd7f0625188492e945240f12d7ad2dca3 # v5.4.0
+        with:
+          tag_prefix: "v"
+          major_pattern: "BREAKING CHANGE:"
+          minor_pattern: "feat:"
+          version_format: "${major}.${minor}.${patch}"
+          bump_each_commit: false
+      
+      - name: Update app version in info.xml
+        if: github.event_name == 'push'
+        run: |
+          sed -i "s/<version>.*<\/version>/<version>${{ steps.version.outputs.version }}<\/version>/" ${{ env.APP_NAME }}/appinfo/info.xml
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ${{ env.APP_NAME }}/appinfo/info.xml
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || true
+          git tag v${{ steps.version.outputs.version }}
+          git push origin v${{ steps.version.outputs.version }}
+      
+      # TODO: Re-enable when needed or use local changelog
+      # - name: Generate Changelog
+      #   if: github.event_name == 'push'
+      #   id: changelog
+      #   uses: mikepenz/release-changelog-builder-action@32e3c96f29a6532607f638797455e9e98cfc703d # v4.2.2
+      #   with:
+      #     configuration: |
+      #       {
+      #         "categories": [
+      #           {"title": "## 🚀 Features", "labels": ["feat", "feature"]},
+      #           {"title": "## 🐛 Bug Fixes", "labels": ["fix", "bugfix"]},
+      #           {"title": "## 🧹 Maintenance", "labels": ["chore", "docs"]}
+      #         ],
+      #         "template": "#{{CHANGELOG}}\n\n**Full Changelog**: #{{UNCATEGORIZED}}"
+      #       }
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: "Release v${{ steps.version.outputs.version }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build app tarball
+        run: cd ${{ env.APP_NAME }} && make appstore
+      
+      - name: Upload to GitHub release
+        uses: svenstaro/upload-release-action@81c65b7cd4de9b2570615ce3aad67a41de5b1a13 # v2
+        id: attach_to_release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.APP_NAME }}/build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          asset_name: ${{ env.APP_NAME }}.tar.gz
+          tag: ${{ github.ref_name }}
+          overwrite: true
+      
+      # TODO: Re-enable for final releases
+      # - name: Upload to Nextcloud App Store
+      #   uses: R0Wi/nextcloud-appstore-push-action@9244bb5445776688cfe90fa1903ea8dff95b0c28 # v1.0.4
+      #   with:
+      #     app_name: ${{ env.APP_NAME }}
+      #     appstore_token: ${{ secrets.APPSTORE_TOKEN }}
+      #     download_url: ${{ steps.attach_to_release.outputs.browser_download_url }}
+      #     app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+      #     nightly: ${{ github.event.release.prerelease }}

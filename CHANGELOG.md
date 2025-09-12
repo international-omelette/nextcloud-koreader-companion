@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27] - 2025-09-12
+
+### Added
+- Automated release pipeline with semantic versioning
+- GitHub Actions workflow for streamlined deployments
+- Automated tarball building and GitHub release creation
+
+### Changed  
+- Version management now automated based on commit message conventions
+- Simplified deployment process for maintainers
+
 ## [1.0.26] - 2025-09-11
 
 ### Added
