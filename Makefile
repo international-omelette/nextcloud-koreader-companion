@@ -1,5 +1,5 @@
 # Makefile for KOReader Companion
-app_name=$(notdir $(CURDIR))
+app_name=koreader-companion
 build_dir=$(CURDIR)/build
 appstore_dir=$(build_dir)/artifacts/appstore
 source_dir=$(build_dir)/artifacts/source
