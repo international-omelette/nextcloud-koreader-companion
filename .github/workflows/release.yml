@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
       
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@ec406be512d7077f68eed36e63f4d91bc006edc4 # v2
         with:
           php-version: '8.1'
           extensions: zip
@@ -36,6 +36,6 @@ jobs:
         with:
           app_name: ${{ env.APP_NAME }}
           appstore_token: ${{ secrets.APPSTORE_TOKEN }}
-          download_url: ${{ steps.github_release.outputs.browser_download_url }}
+          download_url: ${{ fromJSON(steps.github_release.outputs.assets)[0].browser_download_url }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
           nightly: ${{ github.event.release.prerelease }}
