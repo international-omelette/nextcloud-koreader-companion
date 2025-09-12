@@ -26,16 +26,20 @@ jobs:
         run: make appstore
       
       - name: Upload to GitHub release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        uses: svenstaro/upload-release-action@7027b7670c56b9473901daad1fb8a09ab534688e # v2.9.0
         id: github_release
         with:
-          files: build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          asset_name: ${{ env.APP_NAME }}.tar.gz
+          tag: ${{ github.event.release.tag_name }}
+          overwrite: true
       
       - name: Upload app to Nextcloud appstore
         uses: R0Wi/nextcloud-appstore-push-action@cec25fa221c6b2a82701dca2a9455b39f9f7b252 # latest commit
         with:
           app_name: ${{ env.APP_NAME }}
           appstore_token: ${{ secrets.APPSTORE_TOKEN }}
-          download_url: ${{ fromJSON(steps.github_release.outputs.assets)[0].browser_download_url }}
+          download_url: ${{ steps.github_release.outputs.browser_download_url }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
           nightly: ${{ github.event.release.prerelease }}
