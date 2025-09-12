@@ -19,15 +19,16 @@ appstore: clean
 	mkdir -p $(source_dir)
 	
 	# Copy all files except development/build files
-	rsync -a \
-		--exclude='build' \
-		--exclude='.git' \
-		--exclude='.github' \
-		--exclude='*.log' \
-		--exclude='node_modules' \
-		--exclude='Makefile' \
-		--exclude='README.md' \
-		./ $(source_dir)/$(app_name)
+	cp -r . $(source_dir)/$(app_name)
+	
+	# Remove excluded files/directories
+	rm -rf $(source_dir)/$(app_name)/build
+	rm -rf $(source_dir)/$(app_name)/.git
+	rm -rf $(source_dir)/$(app_name)/.github
+	rm -f $(source_dir)/$(app_name)/*.log
+	rm -rf $(source_dir)/$(app_name)/node_modules
+	rm -f $(source_dir)/$(app_name)/Makefile
+	rm -f $(source_dir)/$(app_name)/README.md
 	
 	# Create tarball for app store
 	cd $(source_dir) && tar -czf $(appstore_dir)/$(app_name).tar.gz $(app_name)
