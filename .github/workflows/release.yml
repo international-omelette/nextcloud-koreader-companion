@@ -5,7 +5,7 @@ on:
     types: [published]
 
 env:
-  APP_NAME: koreader-companion
+  APP_NAME: koreader_companion
 
 jobs:
   build-and-release:
