@@ -28,17 +28,26 @@ jobs:
           minor_pattern: "feat:"
           version_format: "${major}.${minor}.${patch}"
           bump_each_commit: false
+          search_commit_body: true
+          user_format_type: "json"
+          enable_prerelease_mode: false
+          debug: false
       
       - name: Update app version in info.xml
         if: github.event_name == 'push'
         run: |
-          sed -i "s/<version>.*<\/version>/<version>${{ steps.version.outputs.version }}<\/version>/" ${{ env.APP_NAME }}/appinfo/info.xml
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add ${{ env.APP_NAME }}/appinfo/info.xml
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || true
-          git tag v${{ steps.version.outputs.version }}
-          git push origin v${{ steps.version.outputs.version }}
+          echo "Current version from semantic-version: ${{ steps.version.outputs.version }}"
+          if [ -n "${{ steps.version.outputs.version }}" ]; then
+            sed -i "s/<version>.*<\/version>/<version>${{ steps.version.outputs.version }}<\/version>/" appinfo/info.xml
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git add appinfo/info.xml
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || true
+            git tag v${{ steps.version.outputs.version }} || true
+            git push origin v${{ steps.version.outputs.version }} || true
+          else
+            echo "No version generated, skipping version update"
+          fi
       
       # TODO: Re-enable when needed or use local changelog
       # - name: Generate Changelog
@@ -71,16 +80,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Build app tarball
-        run: cd ${{ env.APP_NAME }} && make appstore
+        run: make appstore
       
       - name: Upload to GitHub release
         uses: svenstaro/upload-release-action@81c65b7cd4de9b2570615ce3aad67a41de5b1a13 # v2
         id: attach_to_release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ env.APP_NAME }}/build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          file: build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
           asset_name: ${{ env.APP_NAME }}.tar.gz
-          tag: ${{ github.ref_name }}
+          tag: v${{ steps.version.outputs.version }}
           overwrite: true
       
       # TODO: Re-enable for final releases
