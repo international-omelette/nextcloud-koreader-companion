@@ -16,10 +16,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
       
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: zip
+      
       - name: Build app tarball
         run: make appstore
       
       - name: Upload to GitHub release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        id: github_release
         with:
           files: build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+      
+      - name: Upload app to Nextcloud appstore
+        uses: R0Wi/nextcloud-appstore-push-action@cec25fa221c6b2a82701dca2a9455b39f9f7b252 # latest commit
+        with:
+          app_name: ${{ env.APP_NAME }}
+          appstore_token: ${{ secrets.APPSTORE_TOKEN }}
+          download_url: ${{ steps.github_release.outputs.browser_download_url }}
+          app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          nightly: ${{ github.event.release.prerelease }}
