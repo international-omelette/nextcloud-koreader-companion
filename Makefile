@@ -3,6 +3,7 @@ app_name=$(notdir $(CURDIR))
 build_dir=$(CURDIR)/build
 appstore_dir=$(build_dir)/artifacts/appstore
 source_dir=$(build_dir)/artifacts/source
+temp_dir=/tmp/$(app_name)-build
 sign_dir=$(build_dir)/sign
 
 # Clean build artifacts
@@ -16,22 +17,22 @@ install:
 # Create app store tarball
 appstore: clean
 	mkdir -p $(appstore_dir)
-	mkdir -p $(source_dir)
+	mkdir -p $(source_dir)/$(app_name)
 	
-	# Copy all files except development/build files
-	cp -r . $(source_dir)/$(app_name)
-	
-	# Remove excluded files/directories
-	rm -rf $(source_dir)/$(app_name)/build
-	rm -rf $(source_dir)/$(app_name)/.git
-	rm -rf $(source_dir)/$(app_name)/.github
-	rm -f $(source_dir)/$(app_name)/*.log
-	rm -rf $(source_dir)/$(app_name)/node_modules
-	rm -f $(source_dir)/$(app_name)/Makefile
-	rm -f $(source_dir)/$(app_name)/README.md
+	# Copy specific directories and files, excluding unwanted ones
+	cp -r appinfo $(source_dir)/$(app_name)/
+	cp -r css $(source_dir)/$(app_name)/
+	cp -r js $(source_dir)/$(app_name)/
+	cp -r lib $(source_dir)/$(app_name)/
+	cp -r templates $(source_dir)/$(app_name)/
+	test -f CHANGELOG.md && cp CHANGELOG.md $(source_dir)/$(app_name)/ || true
+	test -f LICENSE && cp LICENSE $(source_dir)/$(app_name)/ || true
 	
 	# Create tarball for app store
 	cd $(source_dir) && tar -czf $(appstore_dir)/$(app_name).tar.gz $(app_name)
+	
+	# Clean up source directory but keep tarball
+	rm -rf $(source_dir)
 	
 	@echo "Tarball created at: $(appstore_dir)/$(app_name).tar.gz"
 
