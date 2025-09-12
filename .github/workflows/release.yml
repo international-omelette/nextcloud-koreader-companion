@@ -7,7 +7,7 @@ on:
     types: [published]
 
 env:
-  APP_NAME: koreader_companion
+  APP_NAME: koreader-companion
 
 jobs:
   release:
