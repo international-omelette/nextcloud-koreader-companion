@@ -22,7 +22,7 @@
     <navigation>
       <name>KOReader</name>
       <route>koreader_companion.page.index</route>
-      <icon>app.svg</icon>
+      <icon>icon.svg</icon>
     </navigation>
   </navigations>
 </info>
