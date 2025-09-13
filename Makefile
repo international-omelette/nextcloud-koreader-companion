@@ -22,6 +22,7 @@ appstore: clean
 	# Copy specific directories and files, excluding unwanted ones
 	cp -r appinfo "$(source_dir)/$(app_name)/"
 	cp -r css "$(source_dir)/$(app_name)/"
+	cp -r img "$(source_dir)/$(app_name)/"
 	cp -r js "$(source_dir)/$(app_name)/"
 	cp -r lib "$(source_dir)/$(app_name)/"
 	cp -r templates "$(source_dir)/$(app_name)/"
