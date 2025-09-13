@@ -5,7 +5,7 @@
   <name>KOReader Companion</name>
   <summary>OPDS library and KOReader sync for Nextcloud</summary>
   <description>Transform your Nextcloud into an authenticated OPDS ebook library with full KOReader sync support. Access your ebooks from any OPDS-compatible reader and keep your reading progress synchronized across devices.</description>
-  <version>1.1.5</version>
+  <version>1.1.6</version>
   <licence>AGPL-3.0-or-later</licence>
   <author>Dominik Fischer</author>
   <namespace>KoreaderCompanion</namespace>
