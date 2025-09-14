@@ -35,6 +35,11 @@ jobs:
           tag: ${{ github.event.release.tag_name }}
           overwrite: true
       
+      - name: Wait for release asset availability
+        run: |
+          echo "Waiting for GitHub to propagate release asset..."
+          sleep 30
+
       - name: Upload app to Nextcloud appstore
         uses: R0Wi/nextcloud-appstore-push-action@cec25fa221c6b2a82701dca2a9455b39f9f7b252 # latest commit
         with:
