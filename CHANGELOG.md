@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.9] - 2025-09-14
+
+### Fixed
+- Resolve template errors when books are manually deleted from filesystem
+- Add automatic cleanup of orphaned metadata entries for better data consistency
+- Fix missing composer dependencies in production builds that caused archive extraction failures
+
 ## [1.1.8] - 2025-09-14
 
 ### Fixed
