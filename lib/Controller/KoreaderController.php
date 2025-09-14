@@ -170,23 +170,20 @@ class KoreaderController extends Controller {
             return false;
         }
 
-        // Get user's KOReader sync password hash
-        $syncPasswordHash = $this->config->getUserValue($authUser, 'koreader_companion', 'koreader_sync_password', '');
+        // Get user's stored KOReader sync password MD5 hash
+        $storedMd5Hash = $this->config->getUserValue($authUser, 'koreader_companion', 'koreader_sync_password', '');
 
-        if (empty($syncPasswordHash)) {
-            return false; // No sync password set
+        if (empty($storedMd5Hash)) {
+            return false; // No sync password set for this user
         }
 
         // KOReader sends MD5 hash of password in x-auth-key header
-        // Verify MD5 hash against plain password
+        // Compare directly with stored MD5 hash
         $authSuccess = false;
 
         if (strlen($authKey) === 32 && ctype_xdigit($authKey)) {
-            // KOReader sent MD5 hash - verify against plain password
-            $plainPassword = 'test'; // TODO: Get from secure storage
-            $expectedMd5 = md5($plainPassword);
-
-            if ($authKey === $expectedMd5) {
+            // KOReader sent MD5 hash - compare directly with stored MD5 hash
+            if ($authKey === $storedMd5Hash) {
                 $authSuccess = true;
             }
         }

@@ -108,9 +108,10 @@ class PageController extends Controller {
             return new DataResponse(['error' => 'Password is required'], 400);
         }
         
-        // Store bcrypt hash for secure authentication
-        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-        $this->config->setUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', $hashedPassword);
+        // Store MD5 hash for KOReader authentication compatibility
+        // KOReader protocol requires MD5, so we store MD5 hash (not plain password)
+        $md5Hash = md5($password);
+        $this->config->setUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', $md5Hash);
         
         return new DataResponse(['success' => true]);
     }
