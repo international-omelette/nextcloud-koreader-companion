@@ -121,7 +121,10 @@ class BookService {
             $books = [];
             
             while ($row = $result->fetch()) {
-                $books[] = $this->convertDatabaseRowToBookArray($row, $userId);
+                $book = $this->convertDatabaseRowToBookArray($row, $userId);
+                if ($book !== null) {
+                    $books[] = $book;
+                }
             }
             
             $result->closeCursor();
@@ -187,7 +190,9 @@ class BookService {
 
             // Scan files and update database metadata
             $this->syncFolderToDatabase($booksFolder, $userId);
-            
+
+            // Clean up orphaned database entries (files that no longer exist)
+            $this->cleanupOrphanedMetadata($userId);
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to update metadata: ' . $e->getMessage());
         }
@@ -1679,6 +1684,55 @@ class BookService {
         } catch (\Exception $e) {
             $this->db->rollBack();
             error_log('eBooks app: Failed to cleanup book references for metadata_id ' . $metadataId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Clean up orphaned metadata entries (files that no longer exist in filesystem)
+     */
+    private function cleanupOrphanedMetadata(string $userId): int {
+        try {
+            $cleanedCount = 0;
+            $userFolder = $this->rootFolder->getUserFolder($userId);
+
+            // Get all metadata entries for the user
+            $qb = $this->db->getQueryBuilder();
+            $result = $qb->select('id', 'file_id')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                ->executeQuery();
+
+            while ($row = $result->fetch()) {
+                $metadataId = $row['id'];
+                $fileId = $row['file_id'];
+
+                // Check if file still exists in filesystem
+                $files = $userFolder->getById($fileId);
+                if (empty($files)) {
+                    // File no longer exists, clean up all references
+                    $this->cleanupBookReferences($metadataId, $userId);
+
+                    // Remove the metadata entry itself
+                    $deleteQb = $this->db->getQueryBuilder();
+                    $deleteQb->delete('koreader_metadata')
+                        ->where($deleteQb->expr()->eq('id', $deleteQb->createNamedParameter($metadataId)))
+                        ->executeStatement();
+
+                    $cleanedCount++;
+                    error_log("eBooks app: Cleaned up orphaned metadata entry for file_id $fileId (metadata_id $metadataId)");
+                }
+            }
+            $result->closeCursor();
+
+            if ($cleanedCount > 0) {
+                error_log("eBooks app: Cleaned up $cleanedCount orphaned metadata entries for user $userId");
+            }
+
+            return $cleanedCount;
+
+        } catch (\Exception $e) {
+            error_log('eBooks app: Failed to cleanup orphaned metadata for user ' . $userId . ': ' . $e->getMessage());
+            return 0;
         }
     }
 
