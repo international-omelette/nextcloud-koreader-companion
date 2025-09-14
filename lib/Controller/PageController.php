@@ -69,8 +69,8 @@ class PageController extends Controller {
         $books = $this->bookService->getBooks($page, $perPage);
         
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
-        $opdsUrl = $baseUrl . '/apps/koreader_companion/opds';
-        $koreaderSyncUrl = $baseUrl . '/apps/koreader_companion/sync';
+        $opdsUrl = $baseUrl . 'apps/koreader_companion/opds';
+        $koreaderSyncUrl = $baseUrl . 'apps/koreader_companion/sync';
         
         $hasKoreaderPassword = false;
         if ($user) {
