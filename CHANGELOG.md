@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.7] - 2025-09-14
+
+### Fixed
+- Replace bcrypt verification with MD5 hash verification for KOReader sync endpoint
+- Remove extra slashes in PageController response paths
+- Update app signature for production builds
+
+## [1.1.6] - 2025-09-13
+
+### Fixed
+- Include img directory in production builds for proper icon display
+
+## [1.1.5] - 2025-09-13
+
+### Fixed
+- Resolve production deployment issues
+- Improve build reliability
+
+## [1.1.4] - 2025-09-13
+
+### Fixed
+- Correct app name in Makefile to match app ID
+
+## [1.1.3] - 2025-09-13
+
+### Fixed
+- Replace GitHub release action for reliable download URLs
+- Improve release workflow robustness
+
+## [1.1.2] - 2025-09-13
+
+### Fixed
+- Correct release workflow output variables and pin actions
+- Correct APP_NAME to match app ID in info.xml
+
+## [1.1.1] - 2025-09-12
+
+### Added
+- Automated app store upload with signing
+
+### Changed
+- Simplified release workflow and improved build compatibility
+
 ## [1.1.0] - 2025-09-12
 
 ### Added
@@ -16,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified release workflow to manual release-only process
 - Build system now handles file paths with spaces correctly
 
-### Improved  
+### Changed
 - More predictable and lightweight release management
 - Better cross-platform build compatibility
 
@@ -42,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.25] - 2025-09-09
 
-### Improved
+### Changed
 - Code readability and maintainability
 - Removed unnecessary code comments for cleaner codebase
 
@@ -57,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic loading of books when scrolling to bottom
 - Larger page sizes (50 books) for better performance
 
-### Improved
+### Changed
 - Mobile user experience with touch-friendly infinite scroll
 - Search now finds books across entire collection, not just visible ones
 
@@ -79,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Universal transition system for smoother interactions
 - Enhanced upload modal state management
 
-### Improved
+### Changed
 - Consistent visual timing across all interface elements
 - Better maintainability with centralized design values
 - Smoother animations and hover effects
@@ -98,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge-to-edge table display on mobile devices
 - Updated icons following Nextcloud design standards
 
-### Improved
+### Changed
 - Better organization and navigation between features
 - Enhanced mobile and tablet user experience
 - Sticky table headers with scrollable content
@@ -113,7 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Enhanced PDF metadata extraction (author, title, dates, page count)
 
-### Improved
+### Changed
 - PDF files now show rich metadata instead of just filenames
 - Better handling of large and corrupted PDF files
 
@@ -132,7 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin settings panel
 - Background indexing of ebook libraries
 
-### Features
+### Added
 - Transform Nextcloud folders into OPDS-compatible ebook libraries
 - KOReader integration with sync capabilities
 - Compatible with any OPDS-compatible reader
