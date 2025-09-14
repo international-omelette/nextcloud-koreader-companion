@@ -18,7 +18,10 @@ install:
 appstore: clean
 	mkdir -p "$(appstore_dir)"
 	mkdir -p "$(source_dir)/$(app_name)"
-	
+
+	# Install production dependencies
+	composer install --no-dev
+
 	# Copy specific directories and files, excluding unwanted ones
 	cp -r appinfo "$(source_dir)/$(app_name)/"
 	cp -r css "$(source_dir)/$(app_name)/"
@@ -26,6 +29,7 @@ appstore: clean
 	cp -r js "$(source_dir)/$(app_name)/"
 	cp -r lib "$(source_dir)/$(app_name)/"
 	cp -r templates "$(source_dir)/$(app_name)/"
+	cp -r vendor "$(source_dir)/$(app_name)/"
 	test -f CHANGELOG.md && cp CHANGELOG.md "$(source_dir)/$(app_name)/" || true
 	test -f LICENSE && cp LICENSE "$(source_dir)/$(app_name)/" || true
 	

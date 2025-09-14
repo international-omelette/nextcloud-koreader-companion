@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4bc402e21448f3d190fe5aa5d1cc7b33",
+    "content-hash": "83a6b0864faa9fda686642ac02350e91",
     "packages": [
         {
             "name": "kiwilan/php-archive",
-            "version": "2.3.01",
+            "version": "2.3.02",
             "source": {
                 "type": "git",
                 "url": "https://github.com/kiwilan/php-archive.git",
-                "reference": "b45a04c5244b3546b965e7c4366d6fcef9534861"
+                "reference": "2e202603396a620720aad676c4037eebc0443090"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/kiwilan/php-archive/zipball/b45a04c5244b3546b965e7c4366d6fcef9534861",
-                "reference": "b45a04c5244b3546b965e7c4366d6fcef9534861",
+                "url": "https://api.github.com/repos/kiwilan/php-archive/zipball/2e202603396a620720aad676c4037eebc0443090",
+                "reference": "2e202603396a620720aad676c4037eebc0443090",
                 "shasum": ""
             },
             "require": {
@@ -72,7 +72,7 @@
             ],
             "support": {
                 "issues": "https://github.com/kiwilan/php-archive/issues",
-                "source": "https://github.com/kiwilan/php-archive/tree/v2.3.01"
+                "source": "https://github.com/kiwilan/php-archive/tree/v2.3.02"
             },
             "funding": [
                 {
@@ -80,7 +80,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-01-18T16:35:26+00:00"
+            "time": "2025-08-31T13:13:38+00:00"
         },
         {
             "name": "smalot/pdfparser",
