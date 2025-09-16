@@ -733,7 +733,7 @@ class BookService {
                 $this->parseComicInfoXml($comicInfoXml, $metadata);
             }
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('ComicInfo.xml extraction failed: ' . $e->getMessage());
         }
     }
