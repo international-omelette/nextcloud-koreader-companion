@@ -78,7 +78,7 @@ class PdfMetadataExtractor {
                 'pages' => $pdf->getPages(),
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('PDF metadata extraction failed', [
                 'file' => $file->getPath(),
                 'error' => $e->getMessage()
@@ -207,7 +207,7 @@ class PdfMetadataExtractor {
             if ($date instanceof \DateTime) {
                 return $date->format('Y-m-d H:i:s');
             }
-            
+
             // Handle PDF date strings (D:YYYYMMDDHHmmSSOHH'mm')
             if (is_string($date) && strpos($date, 'D:') === 0) {
                 $dateString = substr($date, 2, 14); // YYYYMMDDHHmmSS
@@ -218,7 +218,7 @@ class PdfMetadataExtractor {
             // Try to parse as regular date string
             $parsed = new \DateTime($date);
             return $parsed->format('Y-m-d H:i:s');
-            
+
         } catch (\Exception $e) {
             $this->logger->debug('Date parsing failed', ['date' => $date, 'error' => $e->getMessage()]);
             return null;
