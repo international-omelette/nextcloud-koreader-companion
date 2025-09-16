@@ -1,8 +1,27 @@
 /**
- * Upload and Metadata Management for eBooks App
+ * Upload and Metadata Management for KOReader Companion
  */
 (function() {
     'use strict';
+
+    // Use global safeEncode function from koreader.js
+    // Fallback implementation if not available
+    function safeEncode(input, context = 'unknown') {
+        // Use global function if available
+        if (window.safeEncode) {
+            return window.safeEncode(input, context);
+        }
+
+        // Fallback implementation
+        try {
+            if (!input) {
+                return '';
+            }
+            return btoa(unescape(encodeURIComponent(input)));
+        } catch (error) {
+            return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+    }
 
     let pendingFiles = [];
     let currentFileIndex = 0;
@@ -252,7 +271,7 @@
         });
 
         // Get the file ID from path - safely encode the path for the API
-        const fileId = btoa(unescape(encodeURIComponent(filePath)));
+        const fileId = safeEncode(filePath, 'upload.js updateExistingMetadata');
         
         // Get the app's base URL using Nextcloud's OC.generateUrl
         const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}/metadata', {id: fileId});
@@ -288,7 +307,7 @@
 
     function deleteBook(filePath) {
         // Get the file ID from path - safely encode the path for the API
-        const fileId = btoa(unescape(encodeURIComponent(filePath)));
+        const fileId = safeEncode(filePath, 'upload.js updateExistingMetadata');
         
         // Get the app's base URL using Nextcloud's OC.generateUrl
         const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}', {id: fileId});
@@ -422,8 +441,6 @@
                     titleField.focus();
                 }
             }).catch(error => {
-                console.error('Failed to extract metadata from file:', error);
-                
                 // Fallback to filename parsing
                 const metadata = extractMetadataFromFilename(file);
                 populateForm(metadata, file);

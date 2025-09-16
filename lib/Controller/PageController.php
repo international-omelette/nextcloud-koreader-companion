@@ -62,7 +62,13 @@ class PageController extends Controller {
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            $books = $this->bookService->searchBooks($query, $page, $perPage);
+            // For AJAX requests, use searchBooks for queries, getBooks for empty/no query
+            // This ensures consistent behavior between initial page load and AJAX calls
+            if (empty($query)) {
+                $books = $this->bookService->getBooks($page, $perPage);
+            } else {
+                $books = $this->bookService->searchBooks($query, $page, $perPage);
+            }
             return new JSONResponse($books);
         }
         

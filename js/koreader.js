@@ -1,13 +1,20 @@
-/**
- * KOReader password management functionality
- * 
- * Simplified approach:
- * - OPDS uses Nextcloud credentials (no setup required)
- * - KOReader uses custom password stored in user preferences
- * - Clean separation between the two authentication systems
- * 
- * Version: 1.0.28-debug - Force cache refresh
- */
+// Unicode-safe base64 encoding for KOReader compatibility
+function safeEncode(input, context = 'unknown') {
+    try {
+        if (!input) {
+            return '';
+        }
+
+        return btoa(unescape(encodeURIComponent(input)));
+    } catch (error) {
+        // Return fallback - use timestamp as unique identifier
+        return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+}
+
+// Make safeEncode globally available
+window.safeEncode = safeEncode;
+
 
 $(document).ready(function() {
     initSidePaneNavigation();
@@ -582,10 +589,14 @@ function initInfiniteScroll() {
     }, 300));
     
     function resetAndSearch() {
-        currentPage = 1;
-        hasMore = true;
-        $('.ebooks-table tbody').empty();
-        loadMoreBooks();
+        try {
+            currentPage = 1;
+            hasMore = true;
+            $('.ebooks-table tbody').empty();
+            loadMoreBooks();
+        } catch (error) {
+            OC.Notification.showTemporary('Search reset failed: ' + error.message);
+        }
     }
     
     async function loadMoreBooks() {
@@ -621,8 +632,13 @@ function initInfiniteScroll() {
                 return;
             }
             
-            books.forEach(book => {
-                $('.ebooks-table tbody').append(createBookRow(book));
+            books.forEach((book, index) => {
+                try {
+                    const bookRow = createBookRow(book);
+                    $('.ebooks-table tbody').append(bookRow);
+                } catch (error) {
+                    OC.Notification.showTemporary(`Failed to display book: ${book.title || 'Unknown'}`);
+                }
             });
             
             currentPage++;
@@ -630,7 +646,6 @@ function initInfiniteScroll() {
             hasMore = books.length >= perPage;
             
         } catch (error) {
-            console.error('Failed to load books:', error);
             hasMore = false;
         } finally {
             loading = false;
@@ -696,8 +711,8 @@ function createBookRow(book) {
         // Format file size
         const fileSize = formatFileSize(book.size || 0);
         
-        // Create book ID (base64 encoded path)
-        const bookId = btoa(book.path || '');
+        // Create book ID (base64 encoded path) - Unicode safe encoding
+        const bookId = safeEncode(book.path, 'book.path');
         
         // Build comic info if applicable
         let comicInfo = '';
@@ -748,14 +763,14 @@ function createBookRow(book) {
                     ${lastSyncHtml}
                 </td>
                 <td class="book-actions-cell">
-                    <button class="action-btn edit-metadata-btn" 
+                    <button class="action-btn edit-metadata-btn"
                             data-book-id="${bookId}"
                             data-title="${escapeHtml(book.title || '')}"
                             data-author="${escapeHtml(book.author || '')}"
-                            data-format="${book.format || ''}"
+                            data-format="${escapeHtml(book.format || '')}"
                             data-language="${escapeHtml(book.language || '')}"
                             data-publisher="${escapeHtml(book.publisher || '')}"
-                            data-publication-date="${book.publication_date || ''}"
+                            data-publication-date="${escapeHtml(book.publication_date || '')}"
                             data-description="${escapeHtml(book.description || '')}"
                             data-tags="${escapeHtml(book.tags || '')}"
                             data-series="${escapeHtml(book.series || '')}"
@@ -780,9 +795,26 @@ function formatFileSize(bytes) {
     }
     
 function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        try {
+            if (!text || typeof text !== 'string') {
+                return '';
+            }
+
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        } catch (error) {
+            return String(text || '').replace(/[&<>"']/g, function(match) {
+                const escapeMap = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                };
+                return escapeMap[match];
+            });
+        }
     }
 
 // Edit metadata modal functionality
@@ -792,7 +824,6 @@ function showEditMetadataModal(bookData) {
     const saveButton = document.getElementById('save-metadata');
     
     if (!metadataModal) {
-        console.error('Metadata modal not found');
         return;
     }
     
@@ -925,7 +956,6 @@ function saveEditedMetadata(bookId) {
                     OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
                 }
             } catch (e) {
-                console.error('Parse error:', e);
                 OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata'));
             }
         } else {
