@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.10] - 2025-09-16
 
 ### Fixed
-- Resolve search functionality bug where clearing search only showed 4 books instead of all books
+- Resolve search functionality bug where clearing search didn't show all books in library
 - Implement Unicode-safe encoding for book file paths with non-Latin characters
-- Handle upstream library errors in CBR and PDF metadata extraction
+- Handle upstream library errors in CBR and PDF metadata extraction (issue filed at https://github.com/kiwilan/php-archive/issues/64)
 - Fix timing delay to prevent GitHub asset 404 errors in release pipeline
 
 ## [1.1.9] - 2025-09-14
