@@ -20,8 +20,11 @@ script('koreader_companion', 'upload');
             <li data-section="books" class="nav-entry active">
                 <a href="#books"><span class="icon icon-category-office"></span> <?php p($l->t('Library')); ?></a>
             </li>
+            <li data-section="settings" class="nav-entry">
+                <a href="#settings"><span class="icon icon-settings"></span> <?php p($l->t('Settings')); ?></a>
+            </li>
             <li data-section="sync" class="nav-entry">
-                <a href="#sync"><span class="icon icon-settings"></span> <?php p($l->t('Sync Settings')); ?></a>
+                <a href="#sync"><span class="icon icon-contact"></span> <?php p($l->t('Sync Settings')); ?></a>
             </li>
             <li data-section="opds" class="nav-entry">
                 <a href="#opds"><span class="icon icon-external"></span> <?php p($l->t('OPDS Access')); ?></a>
@@ -202,7 +205,60 @@ script('koreader_companion', 'upload');
                 </div>
             <?php endif; ?>
         </div>
-        
+
+        <!-- Settings Section -->
+        <div id="settings-section" class="content-section">
+            <div class="header-wrapper">
+                <h2><?php p($l->t('Settings')); ?></h2>
+            </div>
+
+            <div class="connection-section">
+                <h3><?php p($l->t('Library Configuration')); ?></h3>
+                <p><?php p($l->t('Configure your personal ebook library settings.')); ?></p>
+
+                <div class="setting-row">
+                    <label for="ebooks-folder"><?php p($l->t('eBooks Folder:')); ?></label>
+                    <div class="setting-input-group">
+                        <input type="text" id="ebooks-folder" name="folder" placeholder="eBooks" value="" readonly>
+                        <button id="browse-folder-btn" class="btn secondary"><?php p($l->t('Browse')); ?></button>
+                    </div>
+                    <small class="form-help"><?php p($l->t('Browse and select the folder where your ebooks are stored')); ?></small>
+
+                    <div id="folder-change-confirmation" class="info-container" style="display: none;">
+                        <span class="icon icon-info"></span>
+                        <div class="info-content">
+                            <strong><?php p($l->t('Folder Change Behavior:')); ?></strong>
+                            <p><?php p($l->t('When you change folders, your book library index will be automatically cleared and rebuilt from the new location. However, your reading progress is preserved and will automatically reconnect to the same books based on their content fingerprint (MD5 hash), even if they are in a different folder.')); ?></p>
+                            <div class="folder-change-actions">
+                                <button id="save-folder-btn" class="btn primary"><?php p($l->t('Confirm change')); ?></button>
+                                <button id="cancel-folder-btn" class="btn secondary"><?php p($l->t('Cancel')); ?></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <label>
+                        <input type="checkbox" id="restrict-uploads" name="restrict_uploads" value="yes">
+                        <?php p($l->t('Only show books uploaded through this app')); ?>
+                    </label>
+                    <small class="form-help"><?php p($l->t('When enabled, only books uploaded via the web interface will appear in your library')); ?></small>
+                </div>
+
+                <div class="setting-row">
+                    <label>
+                        <input type="checkbox" id="auto-rename" name="auto_rename" value="yes">
+                        <?php p($l->t('Auto-rename files based on metadata')); ?>
+                    </label>
+                    <small class="form-help"><?php p($l->t('Automatically rename uploaded files using title and author information')); ?></small>
+                </div>
+
+                <div class="setting-actions">
+                    <button id="save-settings-btn" class="btn primary"><?php p($l->t('Save Settings')); ?></button>
+                </div>
+            </div>
+        </div>
+
         <!-- Sync Settings Section -->
         <div id="sync-section" class="content-section">
             <div class="header-wrapper">
@@ -357,13 +413,13 @@ script('koreader_companion', 'upload');
     </div>
 
     <!-- Upload Modal -->
-    <div id="upload-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div id="upload-modal" class="koreader-modal" style="display: none;">
+        <div class="koreader-modal-content">
+            <div class="koreader-modal-header">
                 <h2><?php p($l->t('Upload Books')); ?></h2>
-                <button class="modal-close" id="close-upload-modal">&times;</button>
+                <button class="koreader-modal-close" id="close-upload-modal">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="koreader-modal-body">
                 <div class="ebooks-upload-area">
                     <div class="upload-drop-zone" id="upload-drop-zone">
                         <div class="upload-icon"><span class="icon icon-add" style="font-size: 3em;"></span></div>
@@ -380,14 +436,14 @@ script('koreader_companion', 'upload');
     </div>
 
     <!-- Metadata Edit Modal -->
-    <div id="metadata-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div id="metadata-modal" class="koreader-modal" style="display: none;">
+        <div class="koreader-modal-content">
+            <div class="koreader-modal-header">
                 <h2><?php p($l->t('Edit Book Metadata')); ?></h2>
-                <button class="modal-close" id="close-modal">&times;</button>
+                <button class="koreader-modal-close" id="close-modal">&times;</button>
             </div>
             
-            <div class="modal-body">
+            <div class="koreader-modal-body">
                 <form id="metadata-form">
                     <input type="hidden" id="file-path" name="file_path">
                     
@@ -456,9 +512,9 @@ script('koreader_companion', 'upload');
                 </form>
             </div>
             
-            <div class="modal-footer">
+            <div class="koreader-modal-footer">
                 <button type="button" class="btn danger" id="delete-metadata"><?php p($l->t('Delete')); ?></button>
-                <div class="modal-footer-right">
+                <div class="koreader-modal-footer-right">
                     <button type="button" class="btn secondary" id="cancel-metadata"><?php p($l->t('Cancel')); ?></button>
                     <button type="button" class="btn primary" id="save-metadata"><?php p($l->t('Save & Add to Library')); ?></button>
                 </div>
@@ -467,13 +523,13 @@ script('koreader_companion', 'upload');
     </div>
 
     <!-- Upload Progress Modal -->
-    <div id="upload-progress-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div id="upload-progress-modal" class="koreader-modal" style="display: none;">
+        <div class="koreader-modal-content">
+            <div class="koreader-modal-header">
                 <h2><?php p($l->t('Uploading Books')); ?></h2>
-                <button class="modal-close" id="close-upload-progress-modal">&times;</button>
+                <button class="koreader-modal-close" id="close-upload-progress-modal">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="koreader-modal-body">
                 <div id="upload-progress-list"></div>
             </div>
         </div>

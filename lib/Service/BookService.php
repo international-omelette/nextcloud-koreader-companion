@@ -51,7 +51,7 @@ class BookService {
             return [];
         }
 
-        $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+        $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
         $userFolder = $this->rootFolder->getUserFolder($user->getUID());
         
         try {
@@ -99,7 +99,7 @@ class BookService {
                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
                ->setFirstResult($offset)
                ->setMaxResults($perPage);
-            
+
             // Apply sorting
             switch ($sort) {
                 case 'recent':
@@ -147,16 +147,17 @@ class BookService {
         }
 
         $userId = $user->getUID();
-        
+
         // Ensure metadata is up to date first
         $this->ensureMetadataUpToDate($userId);
-        
+
         try {
             $qb = $this->db->getQueryBuilder();
             $result = $qb->select($qb->func()->count('*', 'total_count'))
                 ->from('koreader_metadata')
-                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                ->executeQuery();
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+
+            $result = $qb->executeQuery();
                 
             $count = (int)$result->fetchOne();
             $result->closeCursor();
@@ -169,12 +170,13 @@ class BookService {
         }
     }
 
+
     /**
      * Ensure metadata database is up to date by scanning filesystem
      */
     private function ensureMetadataUpToDate($userId) {
         try {
-            $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+            $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
             $userFolder = $this->rootFolder->getUserFolder($userId);
             
             try {
@@ -894,17 +896,19 @@ class BookService {
         
         // Ensure metadata is up to date
         $this->ensureMetadataUpToDate($userId);
-        
+
         if (empty($query)) {
             return $this->getPaginatedBooks($page, $perPage);
         }
-        
+
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select('*')
                ->from('koreader_metadata')
-               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-               ->andWhere($qb->expr()->orX(
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+
+            // Add search conditions
+            $qb->andWhere($qb->expr()->orX(
                    $qb->expr()->iLike('title', $qb->createNamedParameter('%' . $query . '%')),
                    $qb->expr()->iLike('author', $qb->createNamedParameter('%' . $query . '%')),
                    $qb->expr()->iLike('description', $qb->createNamedParameter('%' . $query . '%')),
@@ -981,16 +985,10 @@ class BookService {
     }
 
     private function shouldIncludeFile(Node $file) {
-        // Check if upload restrictions are enabled globally
-        $restrictUploads = $this->config->getAppValue('koreader_companion', 'restrict_uploads', 'no');
-        if ($restrictUploads !== 'yes') {
-            return true; // No restrictions, include all files
-        }
-
         // Get user context - for OPDS/API calls, extract from file path
         $user = $this->userSession->getUser();
         $userId = null;
-        
+
         if ($user) {
             $userId = $user->getUID();
         } else {
@@ -1000,10 +998,15 @@ class BookService {
                 $userId = $matches[1];
             }
         }
-        
+
         if (!$userId) {
-            // If we can't determine user, allow file to prevent breaking functionality
-            return true;
+            return true; // Default to including files if we can't determine user
+        }
+
+        // Check if upload restrictions are enabled for this user
+        $restrictUploads = $this->config->getUserValue($userId, 'koreader_companion', 'restrict_uploads', 'no');
+        if ($restrictUploads !== 'yes') {
+            return true; // No restrictions, include all files
         }
 
         // Check if this file was uploaded through the app using database tracking
@@ -1018,59 +1021,7 @@ class BookService {
             }
         }
 
-        // If file was not uploaded through app and auto-cleanup is enabled, quarantine it
-        if (!$isAppUploaded) {
-            $autoCleanup = $this->config->getAppValue('koreader_companion', 'auto_cleanup', 'no');
-            if ($autoCleanup === 'yes') {
-                $this->quarantineFileForUser($file, $userId);
-                return false; // Don't include quarantined files
-            }
-        }
-
         return $isAppUploaded; // Only include app-uploaded files when restrictions are enabled
-    }
-
-    /**
-     * Quarantine file for a specific user (used when user context is available)
-     */
-    private function quarantineFile(Node $file) {
-        $user = $this->userSession->getUser();
-        if ($user) {
-            $this->quarantineFileForUser($file, $user->getUID());
-        }
-    }
-
-    /**
-     * Quarantine file for a specific user ID (works in any context)
-     */
-    private function quarantineFileForUser(Node $file, string $userId) {
-        try {
-            $userFolder = $this->rootFolder->getUserFolder($userId);
-            
-            // Create quarantine folder if it doesn't exist
-            try {
-                $quarantineFolder = $userFolder->get('Books_Quarantine');
-            } catch (\OCP\Files\NotFoundException $e) {
-                $quarantineFolder = $userFolder->newFolder('Books_Quarantine');
-            }
-
-            // Move file to quarantine
-            $newName = $file->getName();
-            $counter = 1;
-            while ($quarantineFolder->nodeExists($newName)) {
-                $pathInfo = pathinfo($file->getName());
-                $newName = $pathInfo['filename'] . "_$counter." . $pathInfo['extension'];
-                $counter++;
-            }
-
-            $file->move($quarantineFolder->getPath() . '/' . $newName);
-            
-            // Log the quarantine action
-            error_log("eBooks app: Quarantined file {$file->getName()} to Books_Quarantine/$newName for user $userId (not uploaded through app)");
-            
-        } catch (\Exception $e) {
-            error_log("eBooks app: Failed to quarantine file {$file->getName()} for user $userId: " . $e->getMessage());
-        }
     }
 
     /**
@@ -1894,7 +1845,7 @@ class BookService {
                ->andWhere($qb->expr()->eq('author', $qb->createNamedParameter($author)))
                ->setFirstResult($offset)
                ->setMaxResults($perPage);
-            
+
             // Apply sorting
             switch ($sort) {
                 case 'recent':

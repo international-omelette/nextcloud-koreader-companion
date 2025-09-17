@@ -260,7 +260,7 @@ class PageController extends Controller {
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
             
             // Use the configured folder name
-            $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
             
             try {
                 $booksFolder = $userFolder->get($folderName);
@@ -317,21 +317,21 @@ class PageController extends Controller {
             if (!empty($rawInput)) {
                 parse_str($rawInput, $parsedData);
             }
-            
+
             // Get metadata from request, using parsed data as fallback
             $publicationYear = $this->request->getParam('publication_date', $parsedData['publication_date'] ?? '');
-            
+
             // Validate publication year (must be 4-digit year or empty)
             if (!empty($publicationYear) && (!is_numeric($publicationYear) || strlen($publicationYear) !== 4 || intval($publicationYear) < 1000 || intval($publicationYear) > 2099)) {
                 return new JSONResponse(['error' => 'Publication year must be a 4-digit year (1000-2099)'], Http::STATUS_BAD_REQUEST);
             }
-            
+
             // Convert year to publication_date format (YYYY-MM-DD)
             $publicationDate = null;
             if (!empty($publicationYear)) {
                 $publicationDate = $publicationYear . '-01-01'; // Default to January 1st
             }
-            
+
             $metadata = [
                 'title' => $this->request->getParam('title', $parsedData['title'] ?? ''),
                 'author' => $this->request->getParam('author', $parsedData['author'] ?? ''),
@@ -352,7 +352,7 @@ class PageController extends Controller {
                 return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
             }
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
             
             try {
                 $booksFolder = $userFolder->get($folderName);
@@ -414,7 +414,7 @@ class PageController extends Controller {
                 return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
             }
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
             
             try {
                 $booksFolder = $userFolder->get($folderName);

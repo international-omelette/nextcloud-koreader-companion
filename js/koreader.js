@@ -25,6 +25,7 @@ $(document).ready(function() {
     initInfiniteScroll();
     initResponsiveHandling();
     initHamburgerMenu();
+    initSettings();
 });
 
 // Handle responsive layout transitions smoothly
@@ -100,7 +101,7 @@ function initUploadModal() {
     // ESC key closes modal
     $(document).on('keydown', function(e) {
         if (e.key === 'Escape') {
-            $('.modal:visible').hide();
+            $('.koreader-modal:visible').hide();
         }
     });
     
@@ -1134,4 +1135,138 @@ function handleOutsideClick(e) {
         navigationOpen = false;
         body.classList.remove('navigation-open');
     }
+}
+
+// Settings functionality
+function initSettings() {
+    // Load settings when settings section becomes active
+    $(document).on('click', '[data-section="settings"]', function() {
+        loadSettings();
+    });
+
+    // Save settings button
+    $('#save-settings-btn').on('click', function() {
+        saveSettings();
+    });
+
+    // Save folder button (individual save)
+    $('#save-folder-btn').on('click', function() {
+        saveFolderSetting();
+    });
+
+    // Cancel folder change button
+    $('#cancel-folder-btn').on('click', function() {
+        cancelFolderChange();
+    });
+
+    // Browse folder button
+    $('#browse-folder-btn').on('click', function() {
+        openFolderPicker();
+    });
+
+    // Monitor folder input changes
+    $('#ebooks-folder').on('change input', function() {
+        checkFolderChange();
+    });
+}
+
+// Store original folder value for change detection
+let originalFolderValue = '';
+
+function loadSettings() {
+    $.get(OC.generateUrl('/apps/koreader_companion/settings'))
+        .done(function(data) {
+            const folder = data.folder || 'eBooks';
+            $('#ebooks-folder').val(folder);
+            originalFolderValue = folder; // Store original value
+            $('#restrict-uploads').prop('checked', data.restrict_uploads === 'yes');
+            $('#auto-rename').prop('checked', data.auto_rename === 'yes');
+        })
+        .fail(function() {
+            // Settings failed to load - silent failure
+        });
+}
+
+function saveSettings() {
+    const settings = {
+        folder: $('#ebooks-folder').val() || 'eBooks',
+        restrict_uploads: $('#restrict-uploads').is(':checked') ? 'yes' : 'no',
+        auto_rename: $('#auto-rename').is(':checked') ? 'yes' : 'no'
+    };
+
+    // Save all settings
+    const promises = [
+        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/folder'), method: 'PUT', data: { folder: settings.folder } }),
+        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/restrict-uploads'), method: 'PUT', data: { value: settings.restrict_uploads } }),
+        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/auto-rename'), method: 'PUT', data: { value: settings.auto_rename } })
+    ];
+
+    Promise.all(promises)
+        .then(() => {
+            // Settings saved successfully - silent success
+        })
+        .catch(() => {
+            // Settings failed to save - silent failure
+        });
+}
+
+function saveFolderSetting() {
+    const newFolder = $('#ebooks-folder').val() || 'eBooks';
+    saveFolderDirect(newFolder);
+}
+
+function saveFolderDirect(folder) {
+    const data = { folder: folder };
+
+    $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/folder'), method: 'PUT', data: data })
+        .done(function(response) {
+            originalFolderValue = folder; // Update original value
+            $('#folder-change-confirmation').hide(); // Hide confirmation after save
+
+            // If folder changed, suggest reloading the page
+            if (response.folder_changed) {
+                setTimeout(() => {
+                    if (confirm('Library has been cleared. Would you like to reload the page to see the updated library?')) {
+                        location.reload();
+                    }
+                }, 1000);
+            }
+        })
+        .fail(function() {
+            $('#ebooks-folder').val(originalFolderValue); // Revert on failure
+            // Failed to save folder setting - silent failure
+        });
+}
+
+
+function checkFolderChange() {
+    const currentValue = $('#ebooks-folder').val() || 'eBooks';
+    const isFolderChanging = (originalFolderValue !== currentValue);
+
+    if (isFolderChanging) {
+        $('#folder-change-confirmation').show();
+    } else {
+        $('#folder-change-confirmation').hide();
+    }
+}
+
+function cancelFolderChange() {
+    $('#ebooks-folder').val(originalFolderValue);
+    $('#folder-change-confirmation').hide();
+}
+
+function openFolderPicker() {
+    OC.dialogs.filepicker(
+        t('koreader_companion', 'Select eBooks Folder'),
+        function(path) {
+            // Remove leading slash if present for consistency
+            const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+            $('#ebooks-folder').val(cleanPath);
+            checkFolderChange(); // Check if this triggers the confirmation
+        },
+        false,                          // multiselect
+        'httpd/unix-directory',        // directories only
+        true,                          // modal
+        OC.dialogs.FILEPICKER_TYPE_CHOOSE
+    );
 }

@@ -8,10 +8,10 @@ return [
         ['name' => 'page#uploadBook', 'url' => '/upload', 'verb' => 'POST'],
         ['name' => 'page#updateMetadata', 'url' => '/books/{id}/metadata', 'verb' => 'PUT'],
         ['name' => 'page#deleteBook', 'url' => '/books/{id}', 'verb' => 'DELETE'],
+        ['name' => 'settings#getSettings', 'url' => '/settings', 'verb' => 'GET'],
         ['name' => 'settings#setFolder', 'url' => '/settings/folder', 'verb' => 'PUT'],
-        ['name' => 'settings#setRestrictUploads', 'url' => '/settings/restrict_uploads', 'verb' => 'PUT'],
-        ['name' => 'settings#setAutoCleanup', 'url' => '/settings/auto_cleanup', 'verb' => 'PUT'],
-        ['name' => 'settings#setAutoRename', 'url' => '/settings/auto_rename', 'verb' => 'PUT'],
+        ['name' => 'settings#setRestrictUploads', 'url' => '/settings/restrict-uploads', 'verb' => 'PUT'],
+        ['name' => 'settings#setAutoRename', 'url' => '/settings/auto-rename', 'verb' => 'PUT'],
         
         // OPDS endpoints
         ['name' => 'opds#index', 'url' => '/opds', 'verb' => 'GET'],
