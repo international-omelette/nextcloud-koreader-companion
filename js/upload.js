@@ -193,7 +193,7 @@
 
     function populateFormForEdit(bookData) {
         // Store book ID for update
-        document.getElementById('file-path').value = bookData.bookId;
+        document.getElementById('book-id').value = bookData.bookId;
         
         // Populate all fields
         Object.keys(bookData).forEach(key => {
@@ -289,7 +289,7 @@
     }
 
     function confirmDeleteBook() {
-        const bookId = document.getElementById('file-path').value;
+        const bookId = document.getElementById('book-id').value;
         if (!bookId) {
             showNotification('No book selected for deletion', 'error');
             return;
@@ -563,7 +563,7 @@
 
     function populateForm(metadata, file) {
         // Store file reference
-        document.getElementById('file-path').value = file.name;
+        document.getElementById('book-id').value = file.name;
         
         
         // Populate all fields

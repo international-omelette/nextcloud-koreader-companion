@@ -389,7 +389,7 @@ script('koreader_companion', 'upload');
             
             <div class="modal-body">
                 <form id="metadata-form">
-                    <input type="hidden" id="file-path" name="file_path">
+                    <input type="hidden" id="book-id" name="file_path">
                     
                     <!-- Essential Information -->
                     <div class="form-section">

@@ -847,7 +847,7 @@ function showEditMetadataModal(bookData) {
 function populateEditForm(bookData) {
     // Populate form fields with existing book data
     const fields = {
-        'file-path': bookData.bookId,
+        'book-id': bookData.bookId,
         'book-title': bookData.title || '',
         'book-author': bookData.author || '',
         'book-date': bookData.publicationDate || '',
