@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.11] - 2025-09-18
+
+### Fixed
+- Replace fragile path-based book identification with reliable Nextcloud file ID system
+- Maintain KOReader sync functionality when files are renamed or moved
+- Complete migration to ID-based book operations in frontend interface
+- Standardize form field identifiers for consistent user experience
+
 ## [1.1.10] - 2025-09-16
 
 ### Fixed
