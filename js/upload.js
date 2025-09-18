@@ -136,7 +136,7 @@
         
         const button = e.target;
         const bookData = {
-            path: button.dataset.path,
+            bookId: button.dataset.bookId,
             title: button.dataset.title,
             author: button.dataset.author,
             format: button.dataset.format,

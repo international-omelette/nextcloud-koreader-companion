@@ -711,8 +711,8 @@ function createBookRow(book) {
         // Format file size
         const fileSize = formatFileSize(book.size || 0);
         
-        // Create book ID (base64 encoded path) - Unicode safe encoding
-        const bookId = safeEncode(book.path, 'book.path');
+        // Use the book's file ID directly (no encoding needed)
+        const bookId = book.id;
         
         // Build comic info if applicable
         let comicInfo = '';
