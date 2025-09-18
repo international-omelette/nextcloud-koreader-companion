@@ -3,6 +3,7 @@ namespace OCA\KoreaderCompanion\Controller;
 
 use OCA\KoreaderCompanion\Service\BookService;
 use OCA\KoreaderCompanion\Service\FileTrackingService;
+use OCA\KoreaderCompanion\Service\DocumentHashGenerator;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http\DataResponse;
@@ -24,17 +25,19 @@ class PageController extends Controller {
     private $db;
     private $rootFolder;
     private $fileTrackingService;
+    private $hashGenerator;
 
     public function __construct(
-        IRequest $request, 
-        $appName, 
-        BookService $bookService, 
-        IConfig $config, 
-        IUserSession $userSession, 
-        IURLGenerator $urlGenerator, 
-        IDBConnection $db, 
+        IRequest $request,
+        $appName,
+        BookService $bookService,
+        IConfig $config,
+        IUserSession $userSession,
+        IURLGenerator $urlGenerator,
+        IDBConnection $db,
         IRootFolder $rootFolder,
-        FileTrackingService $fileTrackingService
+        FileTrackingService $fileTrackingService,
+        DocumentHashGenerator $hashGenerator
     ) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
@@ -44,6 +47,7 @@ class PageController extends Controller {
         $this->db = $db;
         $this->rootFolder = $rootFolder;
         $this->fileTrackingService = $fileTrackingService;
+        $this->hashGenerator = $hashGenerator;
     }
 
     /**
@@ -389,6 +393,9 @@ class PageController extends Controller {
 
                 // Rename the file
                 $targetFile->move($parentFolder->getPath() . '/' . $newName);
+
+                // CRITICAL: Update hash mappings after rename to maintain KOReader sync
+                $this->updateHashMappingAfterRename($targetFile, $user->getUID());
             }
 
             return new JSONResponse(['success' => true]);
@@ -645,5 +652,59 @@ class PageController extends Controller {
         $path = preg_replace('/\s+/', ' ', $path);
         // Trim whitespace
         return trim($path);
+    }
+
+    /**
+     * Update filename hash mapping when a file is renamed
+     *
+     * This is critical for KOReader sync - when files are renamed, the filename hash changes
+     * and KOReader sync will break unless we update the hash mapping table.
+     */
+    private function updateHashMappingAfterRename($file, $userId) {
+        try {
+            $fileId = $file->getId();
+
+            // Get the metadata ID for this file
+            $qb = $this->db->getQueryBuilder();
+            $result = $qb->select('id')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId)))
+                ->executeQuery();
+
+            $metadataId = $result->fetchOne();
+            $result->closeCursor();
+
+            if (!$metadataId) {
+                error_log('eBooks app: No metadata found for file after rename: ' . $file->getName());
+                return;
+            }
+
+            // Generate new filename hash
+            $newFilenameHash = $this->hashGenerator->generateFilenameHashFromNode($file);
+            if (!$newFilenameHash) {
+                error_log('eBooks app: Failed to generate new filename hash after rename: ' . $file->getName());
+                return;
+            }
+
+            // Update the filename hash mapping (if it exists)
+            $updateQb = $this->db->getQueryBuilder();
+            $updatedRows = $updateQb->update('koreader_hash_mapping')
+                ->set('document_hash', $updateQb->createNamedParameter($newFilenameHash))
+                ->where($updateQb->expr()->eq('user_id', $updateQb->createNamedParameter($userId)))
+                ->andWhere($updateQb->expr()->eq('metadata_id', $updateQb->createNamedParameter($metadataId)))
+                ->andWhere($updateQb->expr()->eq('hash_type', $updateQb->createNamedParameter('filename')))
+                ->executeStatement();
+
+            if ($updatedRows > 0) {
+                error_log('eBooks app: Updated filename hash mapping after rename - File: ' . $file->getName() . ', New hash: ' . $newFilenameHash);
+            } else {
+                // No existing filename mapping found - this is normal if KOReader hasn't synced this file yet
+                error_log('eBooks app: No filename hash mapping to update after rename - File: ' . $file->getName());
+            }
+
+        } catch (\Exception $e) {
+            error_log('eBooks app: Failed to update hash mapping after rename: ' . $e->getMessage());
+        }
     }
 }
