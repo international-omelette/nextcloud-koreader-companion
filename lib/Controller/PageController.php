@@ -352,24 +352,20 @@ class PageController extends Controller {
                 return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
             }
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
-            
-            try {
-                $booksFolder = $userFolder->get($folderName);
-            } catch (\OCP\Files\NotFoundException $e) {
-                return new JSONResponse(['error' => 'Books folder not found'], Http::STATUS_NOT_FOUND);
-            }
-            
-            // Decode the base64-encoded path ID from frontend
-            $decodedPath = base64_decode($id);
-            if (!$decodedPath) {
+
+            // Validate file ID
+            if (!is_numeric($id)) {
                 return new JSONResponse(['error' => 'Invalid book ID'], Http::STATUS_BAD_REQUEST);
             }
-            
-            // Find file by path recursively
-            $targetFile = $this->findFileByPath($booksFolder, $decodedPath);
 
-            if (!$targetFile) {
+            // Find file by file ID
+            try {
+                $targetFile = $userFolder->getById((int)$id);
+                if (empty($targetFile)) {
+                    return new JSONResponse(['error' => 'Book not found'], Http::STATUS_NOT_FOUND);
+                }
+                $targetFile = $targetFile[0]; // getById returns an array
+            } catch (\OCP\Files\NotFoundException $e) {
                 return new JSONResponse(['error' => 'Book not found'], Http::STATUS_NOT_FOUND);
             }
 
@@ -379,19 +375,20 @@ class PageController extends Controller {
             // Always rename file based on updated metadata
             $currentName = $targetFile->getName();
             $newName = $this->generateStandardFilename($metadata, $currentName);
-            
+
             if ($newName !== $currentName) {
                 // Check for conflicts and resolve
+                $parentFolder = $targetFile->getParent();
                 $counter = 1;
                 $originalNewName = $newName;
-                while ($booksFolder->nodeExists($newName)) {
+                while ($parentFolder->nodeExists($newName)) {
                     $pathInfo = pathinfo($originalNewName);
                     $newName = $pathInfo['filename'] . "_$counter." . $pathInfo['extension'];
                     $counter++;
                 }
-                
+
                 // Rename the file
-                $targetFile->move($booksFolder->getPath() . '/' . $newName);
+                $targetFile->move($parentFolder->getPath() . '/' . $newName);
             }
 
             return new JSONResponse(['success' => true]);
@@ -414,24 +411,20 @@ class PageController extends Controller {
                 return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
             }
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
-            
-            try {
-                $booksFolder = $userFolder->get($folderName);
-            } catch (\OCP\Files\NotFoundException $e) {
-                return new JSONResponse(['error' => 'Books folder not found'], Http::STATUS_NOT_FOUND);
-            }
-            
-            // Decode the base64-encoded path ID from frontend
-            $decodedPath = base64_decode($id);
-            if (!$decodedPath) {
+
+            // Validate file ID
+            if (!is_numeric($id)) {
                 return new JSONResponse(['error' => 'Invalid book ID'], Http::STATUS_BAD_REQUEST);
             }
-            
-            // Find file by path recursively
-            $targetFile = $this->findFileByPath($booksFolder, $decodedPath);
 
-            if (!$targetFile) {
+            // Find file by file ID
+            try {
+                $targetFile = $userFolder->getById((int)$id);
+                if (empty($targetFile)) {
+                    return new JSONResponse(['error' => 'Book not found'], Http::STATUS_NOT_FOUND);
+                }
+                $targetFile = $targetFile[0]; // getById returns an array
+            } catch (\OCP\Files\NotFoundException $e) {
                 return new JSONResponse(['error' => 'Book not found'], Http::STATUS_NOT_FOUND);
             }
 
@@ -607,7 +600,7 @@ class PageController extends Controller {
      */
     private function findFileByPath($folder, $targetPath) {
         $files = $folder->getDirectoryListing();
-        
+
         foreach ($files as $file) {
             if ($file->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
                 // Recursively search subfolders
@@ -618,12 +611,39 @@ class PageController extends Controller {
             } else {
                 // Check if this is the file we're looking for
                 $relativePath = $folder->getRelativePath($file->getPath());
-                if ($relativePath === $targetPath || $file->getName() === basename($targetPath) || $file->getPath() === $targetPath) {
+                $fileName = $file->getName();
+                $targetBasename = basename($targetPath);
+
+                // Primary checks
+                if ($relativePath === $targetPath || $fileName === $targetBasename || $file->getPath() === $targetPath) {
+                    return $file;
+                }
+
+                // Fallback: normalize paths for comparison (handle encoding issues)
+                $normalizedRelativePath = $this->normalizePath($relativePath);
+                $normalizedTargetPath = $this->normalizePath($targetPath);
+                $normalizedFileName = $this->normalizePath($fileName);
+                $normalizedTargetBasename = $this->normalizePath($targetBasename);
+
+                if ($normalizedRelativePath === $normalizedTargetPath ||
+                    $normalizedFileName === $normalizedTargetBasename) {
                     return $file;
                 }
             }
         }
-        
+
         return null;
+    }
+
+    /**
+     * Normalize file path for comparison (handle common encoding issues)
+     */
+    private function normalizePath($path) {
+        // Replace backticks with spaces (common encoding issue)
+        $path = str_replace('`', ' ', $path);
+        // Normalize multiple spaces to single space
+        $path = preg_replace('/\s+/', ' ', $path);
+        // Trim whitespace
+        return trim($path);
     }
 }
