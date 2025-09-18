@@ -164,7 +164,7 @@
             saveButton.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                updateExistingMetadata(bookData.path);
+                updateExistingMetadata(bookData.bookId);
             });
         }
         
@@ -192,8 +192,8 @@
     }
 
     function populateFormForEdit(bookData) {
-        // Store file path for update
-        document.getElementById('file-path').value = bookData.path;
+        // Store book ID for update
+        document.getElementById('file-path').value = bookData.bookId;
         
         // Populate all fields
         Object.keys(bookData).forEach(key => {
@@ -225,7 +225,7 @@
         toggleComicFields();
     }
 
-    function updateExistingMetadata(filePath) {
+    function updateExistingMetadata(bookId) {
         const formData = new FormData(metadataForm);
         
         // Create update data as URL-encoded string
@@ -270,11 +270,8 @@
             showNotification('Network error updating metadata', 'error');
         });
 
-        // Get the file ID from path - safely encode the path for the API
-        const fileId = safeEncode(filePath, 'upload.js updateExistingMetadata');
-        
-        // Get the app's base URL using Nextcloud's OC.generateUrl
-        const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}/metadata', {id: fileId});
+        // Use the book ID directly (no encoding needed)
+        const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}/metadata', {id: bookId});
         
         // Update via our custom endpoint
         xhr.open('PUT', appUrl);
@@ -292,25 +289,22 @@
     }
 
     function confirmDeleteBook() {
-        const filePath = document.getElementById('file-path').value;
-        if (!filePath) {
-            showNotification('No file selected for deletion', 'error');
+        const bookId = document.getElementById('file-path').value;
+        if (!bookId) {
+            showNotification('No book selected for deletion', 'error');
             return;
         }
 
         const title = document.getElementById('book-title').value || 'this book';
-        
+
         if (confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
-            deleteBook(filePath);
+            deleteBook(bookId);
         }
     }
 
-    function deleteBook(filePath) {
-        // Get the file ID from path - safely encode the path for the API
-        const fileId = safeEncode(filePath, 'upload.js updateExistingMetadata');
-        
-        // Get the app's base URL using Nextcloud's OC.generateUrl
-        const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}', {id: fileId});
+    function deleteBook(bookId) {
+        // Use the file ID directly (no encoding needed)
+        const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}', {id: bookId});
         
         const xhr = new XMLHttpRequest();
         
