@@ -1,7 +1,6 @@
 <?php
 namespace OCA\KoreaderCompanion\Service;
 
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCP\Files\IRootFolder;
 use OCP\Files\Node;
 use OCP\IConfig;
@@ -15,22 +14,19 @@ class BookService {
     private $rootFolder;
     private $config;
     private $userSession;
-    private $fileTrackingService;
     private $db;
     private $pdfExtractor;
 
     public function __construct(
-        IRootFolder $rootFolder, 
-        IConfig $config, 
+        IRootFolder $rootFolder,
+        IConfig $config,
         IUserSession $userSession,
-        FileTrackingService $fileTrackingService,
         IDBConnection $db,
         PdfMetadataExtractor $pdfExtractor
     ) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->userSession = $userSession;
-        $this->fileTrackingService = $fileTrackingService;
         $this->db = $db;
         $this->pdfExtractor = $pdfExtractor;
     }
@@ -210,9 +206,7 @@ class BookService {
             } else {
                 $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
                 if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    if ($this->shouldIncludeFile($node)) {
-                        $this->ensureFileInDatabase($node, $userId);
-                    }
+                    $this->ensureFileInDatabase($node, $userId);
                 }
             }
         }
@@ -380,10 +374,7 @@ class BookService {
             } else {
                 $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
                 if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    // Check if this file should be included based on upload restrictions
-                    if ($this->shouldIncludeFile($node)) {
-                        $books[] = $this->extractMetadata($node);
-                    }
+                    $books[] = $this->extractMetadata($node);
                 }
             }
         }
@@ -984,111 +975,7 @@ class BookService {
         }
     }
 
-    private function shouldIncludeFile(Node $file) {
-        // Get user context - for OPDS/API calls, extract from file path
-        $user = $this->userSession->getUser();
-        $userId = null;
 
-        if ($user) {
-            $userId = $user->getUID();
-        } else {
-            // Extract user ID from file path for API contexts
-            $path = $file->getPath();
-            if (preg_match('/^\/([^\/]+)\/files\//', $path, $matches)) {
-                $userId = $matches[1];
-            }
-        }
-
-        if (!$userId) {
-            return true; // Default to including files if we can't determine user
-        }
-
-        // Check if upload restrictions are enabled for this user
-        $restrictUploads = $this->config->getUserValue($userId, 'koreader_companion', 'restrict_uploads', 'no');
-        if ($restrictUploads !== 'yes') {
-            return true; // No restrictions, include all files
-        }
-
-        // Check if this file was uploaded through the app using database tracking
-        $isAppUploaded = $this->fileTrackingService->isAppUploadedFile($file, $userId);
-        
-        // If file is not tracked, check if it might be a legacy file or use fallback
-        if (!$isAppUploaded) {
-            $uploadMethod = $this->fileTrackingService->getFileUploadMethod($file, $userId);
-            if ($uploadMethod === null) {
-                // File not tracked - check file creation context and legacy preferences
-                $isAppUploaded = $this->checkFileOriginWithFallback($file, $userId);
-            }
-        }
-
-        return $isAppUploaded; // Only include app-uploaded files when restrictions are enabled
-    }
-
-    /**
-     * Check file origin when tracking data is unavailable
-     * This provides a fallback mechanism for determining if files should be included
-     */
-    private function checkFileOriginWithFallback(Node $file, string $userId) {
-        try {
-            // First, check legacy JSON tracking in user preferences
-            $legacyTracking = $this->checkLegacyTracking($file, $userId);
-            if ($legacyTracking !== null) {
-                // Migrate to database if found in legacy tracking
-                if ($legacyTracking) {
-                    $this->fileTrackingService->markFileAsAppUploaded($file, $userId);
-                }
-                return $legacyTracking;
-            }
-
-            // Check if file was created very recently (within last 5 minutes)
-            // Recent files are likely from current session and should be included
-            $createTime = $file->getMTime();
-            $currentTime = time();
-            if (($currentTime - $createTime) < 300) { // 5 minutes
-                // Mark recent files as external uploads for future reference
-                $this->fileTrackingService->markFileAsExternalUpload($file, $userId);
-                return true;
-            }
-
-            // For older files, be conservative and exclude them when restrictions are enabled
-            // This prevents processing of files that were uploaded before restrictions were activated
-            $this->fileTrackingService->markFileAsExternalUpload($file, $userId);
-            return false;
-            
-        } catch (\Exception $e) {
-            // If we can't determine file age, default to including it
-            return true;
-        }
-    }
-
-    /**
-     * Check legacy JSON tracking in user preferences
-     */
-    private function checkLegacyTracking(Node $file, string $userId): ?bool {
-        try {
-            $appUploadedFiles = $this->config->getUserValue(
-                $userId,
-                'koreader_companion',
-                'app_uploaded_files',
-                ''
-            );
-
-            if (empty($appUploadedFiles)) {
-                return null; // No legacy data
-            }
-
-            $uploadedList = json_decode($appUploadedFiles, true);
-            if (!is_array($uploadedList)) {
-                return null; // Invalid legacy data
-            }
-
-            $fileId = $file->getId();
-            return in_array($fileId, $uploadedList);
-            
-        } catch (\Exception $e) {
-            return null; // Error reading legacy data
-        }
-    }
 
     public function getBookById($id) {
         $allBooks = $this->getBooks();

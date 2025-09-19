@@ -2,7 +2,6 @@
 namespace OCA\KoreaderCompanion\Controller;
 
 use OCA\KoreaderCompanion\Service\BookService;
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http\DataResponse;
@@ -23,18 +22,16 @@ class PageController extends Controller {
     private $urlGenerator;
     private $db;
     private $rootFolder;
-    private $fileTrackingService;
 
     public function __construct(
-        IRequest $request, 
-        $appName, 
-        BookService $bookService, 
-        IConfig $config, 
-        IUserSession $userSession, 
-        IURLGenerator $urlGenerator, 
-        IDBConnection $db, 
-        IRootFolder $rootFolder,
-        FileTrackingService $fileTrackingService
+        IRequest $request,
+        $appName,
+        BookService $bookService,
+        IConfig $config,
+        IUserSession $userSession,
+        IURLGenerator $urlGenerator,
+        IDBConnection $db,
+        IRootFolder $rootFolder
     ) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
@@ -43,7 +40,6 @@ class PageController extends Controller {
         $this->urlGenerator = $urlGenerator;
         $this->db = $db;
         $this->rootFolder = $rootFolder;
-        $this->fileTrackingService = $fileTrackingService;
     }
 
     /**
@@ -288,8 +284,6 @@ class PageController extends Controller {
             $newFile = $booksFolder->newFile($filename);
             $newFile->putContent(file_get_contents($uploadedFiles['tmp_name']));
 
-            // Mark file as uploaded through the app
-            $this->markFileAsAppUploaded($newFile);
 
             // Store metadata (implement this based on your metadata storage system)
             $this->storeBookMetadata($newFile, $metadata);
@@ -514,18 +508,6 @@ class PageController extends Controller {
         }
     }
 
-    /**
-     * Mark a file as uploaded through the app interface
-     */
-    private function markFileAsAppUploaded($file) {
-        $user = $this->userSession->getUser();
-        if (!$user) {
-            return;
-        }
-
-        // Use the FileTrackingService instead of JSON preferences
-        $this->fileTrackingService->markFileAsAppUploaded($file, $user->getUID());
-    }
 
     /**
      * Generate standardized filename based on metadata: "Title - Author (Year).ext"

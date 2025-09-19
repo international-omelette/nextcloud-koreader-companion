@@ -237,13 +237,6 @@ script('koreader_companion', 'upload');
                     </div>
                 </div>
 
-                <div class="setting-row">
-                    <label>
-                        <input type="checkbox" id="restrict-uploads" name="restrict_uploads" value="yes">
-                        <?php p($l->t('Only show books uploaded through this app')); ?>
-                    </label>
-                    <small class="form-help"><?php p($l->t('When enabled, only books uploaded via the web interface will appear in your library')); ?></small>
-                </div>
 
                 <div class="setting-row">
                     <label>

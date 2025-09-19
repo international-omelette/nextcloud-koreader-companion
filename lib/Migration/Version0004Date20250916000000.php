@@ -11,11 +11,11 @@ use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
 
 /**
- * Migration to convert app-wide settings to per-user settings
+ * Migration to convert app-wide settings to per-user settings and clean up file tracking
  *
- * This migration moves folder, restrict_uploads, and auto_rename settings
- * from app-wide configuration to per-user preferences, and removes
- * the auto_cleanup setting entirely.
+ * This migration moves folder and auto_rename settings from app-wide configuration
+ * to per-user preferences, removes the restrict_uploads and auto_cleanup settings entirely,
+ * and drops the koreader_file_tracking table.
  */
 class Version0004Date20250916000000 extends SimpleMigrationStep {
 
@@ -49,8 +49,9 @@ class Version0004Date20250916000000 extends SimpleMigrationStep {
 
         $output->info(sprintf('Found %d app-wide settings to migrate', count($appSettings)));
 
-        // Skip auto_cleanup - it will be removed
+        // Skip auto_cleanup and restrict_uploads - they will be removed
         unset($appSettings['auto_cleanup']);
+        unset($appSettings['restrict_uploads']);
 
         // If we have settings to migrate, apply them to all users
         if (!empty($appSettings)) {
@@ -107,14 +108,33 @@ class Version0004Date20250916000000 extends SimpleMigrationStep {
 
         $output->info('Removed old app-wide settings from appconfig');
 
+        // Drop the file tracking table since upload restrictions are removed
+        $output->info('Dropping file tracking table...');
+        $qb = $this->db->getQueryBuilder();
+        try {
+            $qb->getConnection()->executeStatement('DROP TABLE IF EXISTS `koreader_file_tracking`');
+            $output->info('File tracking table dropped successfully');
+        } catch (\Exception $e) {
+            $output->info('File tracking table does not exist or could not be dropped: ' . $e->getMessage());
+        }
+
+        // Clean up any restrict_uploads user preferences
+        $output->info('Cleaning up restrict_uploads user preferences...');
+        $cleanupQb = $this->db->getQueryBuilder();
+        $deletedCount = $cleanupQb->delete('preferences')
+            ->where($cleanupQb->expr()->eq('appid', $cleanupQb->createNamedParameter('koreader_companion')))
+            ->andWhere($cleanupQb->expr()->eq('configkey', $cleanupQb->createNamedParameter('restrict_uploads')))
+            ->executeStatement();
+        $output->info(sprintf('Removed %d restrict_uploads user preferences', $deletedCount));
+
         // Log the defaults that will be used for new users
         $defaults = [
             'folder' => $appSettings['folder'] ?? 'eBooks',
-            'restrict_uploads' => $appSettings['restrict_uploads'] ?? 'no',
             'auto_rename' => $appSettings['auto_rename'] ?? 'no'
         ];
 
         $output->info('Migration completed successfully.');
         $output->info('Settings are now per-user with defaults: ' . json_encode($defaults));
+        $output->info('File tracking and upload restrictions have been completely removed.');
     }
 }
