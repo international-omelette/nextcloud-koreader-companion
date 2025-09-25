@@ -832,10 +832,17 @@ body.resizing * {
 }
 
 .setting-row label {
-    display: block;
+    display: flex;
+    align-items: center;
     margin-bottom: 4px;
     font-weight: 500;
     color: var(--color-main-text);
+    line-height: 1.5;
+}
+
+.setting-row label input[type="checkbox"] {
+    flex: none;
+    margin: 0 8px 0 0;
 }
 
 .setting-input-group {
