@@ -367,7 +367,7 @@ class BookService {
         }
     }
 
-    private function scanFolder(Node $folder, &$books) {
+    protected function scanFolder(Node $folder, &$books) {
         foreach ($folder->getDirectoryListing() as $node) {
             if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
                 $this->scanFolder($node, $books);

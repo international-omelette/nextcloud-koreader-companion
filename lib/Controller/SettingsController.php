@@ -1,24 +1,33 @@
 <?php
 namespace OCA\KoreaderCompanion\Controller;
 
+use OCA\KoreaderCompanion\Service\BookService;
+use OCA\KoreaderCompanion\Service\FilenameService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
 use OCP\IDBConnection;
+use OCP\Files\IRootFolder;
 
 class SettingsController extends Controller {
 
     private $config;
     private $userSession;
     private $db;
+    private $bookService;
+    private $rootFolder;
+    private $filenameService;
 
-    public function __construct(IRequest $request, IConfig $config, IUserSession $userSession, IDBConnection $db, $appName) {
+    public function __construct(IRequest $request, IConfig $config, IUserSession $userSession, IDBConnection $db, BookService $bookService, IRootFolder $rootFolder, FilenameService $filenameService, $appName) {
         parent::__construct($appName, $request);
         $this->config = $config;
         $this->userSession = $userSession;
         $this->db = $db;
+        $this->bookService = $bookService;
+        $this->rootFolder = $rootFolder;
+        $this->filenameService = $filenameService;
     }
 
     /**
@@ -72,27 +81,127 @@ class SettingsController extends Controller {
      * @NoAdminRequired
      * @NoCSRFRequired
      */
-    public function setRestrictUploads($value) {
+    public function setAutoRename($auto_rename) {
         $user = $this->getAuthenticatedUser();
         if ($user instanceof JSONResponse) {
             return $user; // Return error response
         }
-        $this->config->setUserValue($user->getUID(), $this->appName, 'restrict_uploads', $value);
+
+        // Ensure we have a valid string value ('yes' or 'no')
+        $value = ($auto_rename === 'yes') ? 'yes' : 'no';
+
+        $this->config->setUserValue($user->getUID(), $this->appName, 'auto_rename', $value);
         return new JSONResponse(['status' => 'success']);
     }
-
 
     /**
      * @NoAdminRequired
      * @NoCSRFRequired
      */
-    public function setAutoRename($value) {
+    public function batchRename($auto_rename) {
         $user = $this->getAuthenticatedUser();
         if ($user instanceof JSONResponse) {
             return $user; // Return error response
         }
-        $this->config->setUserValue($user->getUID(), $this->appName, 'auto_rename', $value);
-        return new JSONResponse(['status' => 'success']);
+
+        $userId = $user->getUID();
+
+        try {
+            // First, enable auto-rename setting
+            $this->config->setUserValue($userId, $this->appName, 'auto_rename', $auto_rename);
+
+            // Get user's eBooks folder
+            $userFolder = $this->rootFolder->getUserFolder($userId);
+            $folderName = $this->config->getUserValue($userId, $this->appName, 'folder', 'eBooks');
+
+            try {
+                $booksFolder = $userFolder->get($folderName);
+            } catch (\OCP\Files\NotFoundException $e) {
+                return new JSONResponse(['error' => 'eBooks folder not found'], 404);
+            }
+
+            $totalBooks = $this->bookService->getTotalBookCount();
+
+            if ($totalBooks === 0) {
+                return new JSONResponse([
+                    'status' => 'success',
+                    'renamed_count' => 0,
+                    'total_books' => 0
+                ]);
+            }
+
+            // Process books immediately with chunked approach
+            return $this->processBatchRenameImmediate($userId, $userFolder, $totalBooks);
+
+        } catch (\Exception $e) {
+            return new JSONResponse(['error' => 'Batch rename failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Process batch rename immediately using chunked processing
+     */
+    private function processBatchRenameImmediate(string $userId, $userFolder, int $totalBooks): JSONResponse {
+        $renamedCount = 0;
+        $processedCount = 0;
+        $chunkSize = 100;
+
+        // Process books in chunks to handle medium libraries efficiently
+        $totalPages = ceil($totalBooks / $chunkSize);
+
+        for ($page = 1; $page <= $totalPages; $page++) {
+            // Get chunk of books with metadata from database
+            $books = $this->bookService->getBooks($page, $chunkSize);
+
+            if (empty($books)) {
+                continue; // Skip if database approach fails for this chunk
+            }
+
+            // Process each book in current chunk
+            foreach ($books as $book) {
+                try {
+                    $fileId = $book['id'];
+                    $files = $userFolder->getById($fileId);
+
+                    if (empty($files)) {
+                        continue; // File not found, skip
+                    }
+
+                    $file = $files[0];
+                    $currentName = $file->getName();
+                    $processedCount++;
+
+                    // Generate standardized filename using the metadata from database
+                    $newName = $this->filenameService->generateStandardFilename($book, $currentName);
+
+                    if ($newName !== $currentName) {
+                        // Check for conflicts and resolve
+                        $parentFolder = $file->getParent();
+                        $finalName = $this->filenameService->resolveFilenameConflict($parentFolder, $newName);
+
+                        // Perform the rename
+                        $file->move($parentFolder->getPath() . '/' . $finalName);
+                        $renamedCount++;
+                    }
+                } catch (\Exception $e) {
+                    // Log error but continue with other files
+                    continue;
+                }
+            }
+
+            // Small delay between chunks to be gentle on the system
+            if ($page < $totalPages) {
+                usleep(10000); // 10ms delay between chunks
+            }
+        }
+
+        return new JSONResponse([
+            'status' => 'success',
+            'renamed_count' => $renamedCount,
+            'total_books' => $totalBooks,
+            'processed_count' => $processedCount,
+            'processed_immediately' => true
+        ]);
     }
 
     /**
@@ -108,7 +217,6 @@ class SettingsController extends Controller {
         $userId = $user->getUID();
         return new JSONResponse([
             'folder' => $this->config->getUserValue($userId, $this->appName, 'folder', 'eBooks'),
-            'restrict_uploads' => $this->config->getUserValue($userId, $this->appName, 'restrict_uploads', 'no'),
             'auto_rename' => $this->config->getUserValue($userId, $this->appName, 'auto_rename', 'no')
         ]);
     }
@@ -158,4 +266,5 @@ class SettingsController extends Controller {
             return 0;
         }
     }
+
 }

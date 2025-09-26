@@ -241,13 +241,22 @@ script('koreader_companion', 'upload');
                 <div class="setting-row">
                     <label>
                         <input type="checkbox" id="auto-rename" name="auto_rename" value="yes">
-                        <?php p($l->t('Auto-rename files based on metadata')); ?>
+                        <span><?php p($l->t('Auto-rename files based on metadata')); ?></span>
                     </label>
                     <small class="form-help"><?php p($l->t('Automatically rename uploaded files using title and author information')); ?></small>
-                </div>
 
-                <div class="setting-actions">
-                    <button id="save-settings-btn" class="btn primary"><?php p($l->t('Save Settings')); ?></button>
+                    <div id="auto-rename-confirmation" class="info-container" style="display: none;">
+                        <span class="icon icon-info"></span>
+                        <div class="info-content">
+                            <strong><?php p($l->t('Auto-rename Activation:')); ?></strong>
+                            <p><?php p($l->t('Enabling auto-rename will immediately rename ALL existing books in your library to the standardized format: "Author - Title.ext" or "Author - Title (Year).ext" if year is available. Original filenames will not be preserved. This action cannot be undone.')); ?></p>
+                            <p><strong><?php p($l->t('Format examples:')); ?></strong> <code>F. Scott Fitzgerald - The Great Gatsby (1925).epub</code> or <code>Jane Doe - My Book.pdf</code></p>
+                            <div class="folder-change-actions">
+                                <button id="confirm-auto-rename-btn" class="btn primary"><?php p($l->t('Enable and rename all books')); ?></button>
+                                <button id="cancel-auto-rename-btn" class="btn secondary"><?php p($l->t('Cancel')); ?></button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

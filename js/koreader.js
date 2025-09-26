@@ -1144,11 +1144,6 @@ function initSettings() {
         loadSettings();
     });
 
-    // Save settings button
-    $('#save-settings-btn').on('click', function() {
-        saveSettings();
-    });
-
     // Save folder button (individual save)
     $('#save-folder-btn').on('click', function() {
         saveFolderSetting();
@@ -1168,10 +1163,25 @@ function initSettings() {
     $('#ebooks-folder').on('change input', function() {
         checkFolderChange();
     });
+
+    // Auto-rename confirmation handling
+    $('#confirm-auto-rename-btn').on('click', function() {
+        confirmAutoRename();
+    });
+
+    $('#cancel-auto-rename-btn').on('click', function() {
+        cancelAutoRename();
+    });
+
+    // Monitor auto-rename checkbox changes
+    $('#auto-rename').on('change', function() {
+        checkAutoRenameChange();
+    });
 }
 
 // Store original folder value for change detection
 let originalFolderValue = '';
+let originalAutoRenameValue = false;
 
 function loadSettings() {
     $.get(OC.generateUrl('/apps/koreader_companion/settings'))
@@ -1179,36 +1189,16 @@ function loadSettings() {
             const folder = data.folder || 'eBooks';
             $('#ebooks-folder').val(folder);
             originalFolderValue = folder; // Store original value
-            $('#restrict-uploads').prop('checked', data.restrict_uploads === 'yes');
-            $('#auto-rename').prop('checked', data.auto_rename === 'yes');
+
+            const autoRename = data.auto_rename === 'yes';
+            $('#auto-rename').prop('checked', autoRename);
+            originalAutoRenameValue = autoRename; // Store original value
         })
         .fail(function() {
             // Settings failed to load - silent failure
         });
 }
 
-function saveSettings() {
-    const settings = {
-        folder: $('#ebooks-folder').val() || 'eBooks',
-        restrict_uploads: $('#restrict-uploads').is(':checked') ? 'yes' : 'no',
-        auto_rename: $('#auto-rename').is(':checked') ? 'yes' : 'no'
-    };
-
-    // Save all settings
-    const promises = [
-        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/folder'), method: 'PUT', data: { folder: settings.folder } }),
-        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/restrict-uploads'), method: 'PUT', data: { value: settings.restrict_uploads } }),
-        $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/auto-rename'), method: 'PUT', data: { value: settings.auto_rename } })
-    ];
-
-    Promise.all(promises)
-        .then(() => {
-            // Settings saved successfully - silent success
-        })
-        .catch(() => {
-            // Settings failed to save - silent failure
-        });
-}
 
 function saveFolderSetting() {
     const newFolder = $('#ebooks-folder').val() || 'eBooks';
@@ -1269,4 +1259,79 @@ function openFolderPicker() {
         true,                          // modal
         OC.dialogs.FILEPICKER_TYPE_CHOOSE
     );
+}
+
+// Auto-rename handling functions
+function checkAutoRenameChange() {
+    const currentValue = $('#auto-rename').is(':checked');
+
+    // Only show confirmation when changing from off to on
+    if (!originalAutoRenameValue && currentValue) {
+        $('#auto-rename-confirmation').show();
+    } else {
+        $('#auto-rename-confirmation').hide();
+        // If turning off, save immediately without confirmation
+        if (originalAutoRenameValue && !currentValue) {
+            saveAutoRenameSetting(false);
+        }
+    }
+}
+
+function confirmAutoRename() {
+    // Show loading state
+    $('#confirm-auto-rename-btn').prop('disabled', true).text('Processing...');
+
+    // Enable auto-rename and trigger batch rename
+    $.ajax({
+        url: OC.generateUrl('/apps/koreader_companion/settings/batch-rename'),
+        method: 'POST',
+        data: { auto_rename: 'yes' }
+    })
+    .done(function(response) {
+        originalAutoRenameValue = true;
+        $('#auto-rename-confirmation').hide();
+
+        // Show success message and suggest reload
+        OC.Notification.showTemporary(
+            `Successfully renamed ${response.renamed_count} books to standardized format.`
+        );
+
+        setTimeout(() => {
+            if (confirm('Books have been renamed. Would you like to reload the page to see the updated filenames?')) {
+                location.reload();
+            }
+        }, 1500);
+    })
+    .fail(function(xhr) {
+        const error = xhr.responseJSON?.error || 'Failed to enable auto-rename';
+        OC.Notification.showTemporary(error);
+
+        // Revert checkbox state
+        $('#auto-rename').prop('checked', originalAutoRenameValue);
+        $('#auto-rename-confirmation').hide();
+    })
+    .always(function() {
+        $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+    });
+}
+
+function cancelAutoRename() {
+    // Revert checkbox to original state
+    $('#auto-rename').prop('checked', originalAutoRenameValue);
+    $('#auto-rename-confirmation').hide();
+}
+
+function saveAutoRenameSetting(enabled) {
+    $.ajax({
+        url: OC.generateUrl('/apps/koreader_companion/settings/auto-rename'),
+        method: 'PUT',
+        data: { auto_rename: enabled ? 'yes' : 'no' }
+    })
+    .done(function() {
+        originalAutoRenameValue = enabled;
+    })
+    .fail(function() {
+        // Revert on failure
+        $('#auto-rename').prop('checked', originalAutoRenameValue);
+    });
 }

@@ -2,6 +2,7 @@
 namespace OCA\KoreaderCompanion\Controller;
 
 use OCA\KoreaderCompanion\Service\BookService;
+use OCA\KoreaderCompanion\Service\FilenameService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http\DataResponse;
@@ -22,11 +23,13 @@ class PageController extends Controller {
     private $urlGenerator;
     private $db;
     private $rootFolder;
+    private $filenameService;
 
     public function __construct(
         IRequest $request,
         $appName,
         BookService $bookService,
+        FilenameService $filenameService,
         IConfig $config,
         IUserSession $userSession,
         IURLGenerator $urlGenerator,
@@ -35,6 +38,7 @@ class PageController extends Controller {
     ) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
+        $this->filenameService = $filenameService;
         $this->config = $config;
         $this->userSession = $userSession;
         $this->urlGenerator = $urlGenerator;
@@ -265,18 +269,20 @@ class PageController extends Controller {
                 $booksFolder = $userFolder->newFolder($folderName);
             }
 
-            // Generate standardized filename based on metadata first
+            // Check if auto-rename is enabled for this user
+            $autoRename = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'auto_rename', 'no');
+
             $originalFilename = $uploadedFiles['name'];
-            $filename = $this->generateStandardFilename($metadata, $originalFilename);
+            if ($autoRename === 'yes') {
+                // Generate standardized filename based on metadata
+                $filename = $this->filenameService->generateStandardFilename($metadata, $originalFilename);
+            } else {
+                // Keep original filename
+                $filename = $originalFilename;
+            }
             
             // Check for conflicts and resolve with auto-renaming
-            $counter = 1;
-            $baseFilename = $filename;
-            while ($booksFolder->nodeExists($filename)) {
-                $pathInfo = pathinfo($baseFilename);
-                $filename = $pathInfo['filename'] . "_$counter." . $pathInfo['extension'];
-                $counter++;
-            }
+            $filename = $this->filenameService->resolveFilenameConflict($booksFolder, $filename);
             
             $targetPath = $booksFolder->getPath() . '/' . $filename;
 
@@ -366,20 +372,20 @@ class PageController extends Controller {
             // Update metadata
             $this->storeBookMetadata($targetFile, $metadata);
 
-            // Always rename file based on updated metadata
+            // Check if auto-rename is enabled before renaming based on updated metadata
+            $autoRename = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'auto_rename', 'no');
             $currentName = $targetFile->getName();
-            $newName = $this->generateStandardFilename($metadata, $currentName);
+
+            if ($autoRename === 'yes') {
+                $newName = $this->filenameService->generateStandardFilename($metadata, $currentName);
+            } else {
+                $newName = $currentName; // Keep current filename
+            }
 
             if ($newName !== $currentName) {
                 // Check for conflicts and resolve
                 $parentFolder = $targetFile->getParent();
-                $counter = 1;
-                $originalNewName = $newName;
-                while ($parentFolder->nodeExists($newName)) {
-                    $pathInfo = pathinfo($originalNewName);
-                    $newName = $pathInfo['filename'] . "_$counter." . $pathInfo['extension'];
-                    $counter++;
-                }
+                $newName = $this->filenameService->resolveFilenameConflict($parentFolder, $newName);
 
                 // Rename the file
                 $targetFile->move($parentFolder->getPath() . '/' . $newName);
@@ -509,73 +515,6 @@ class PageController extends Controller {
     }
 
 
-    /**
-     * Generate standardized filename based on metadata: "Title - Author (Year).ext"
-     */
-    private function generateStandardFilename($metadata, $originalFilename) {
-        // Get file extension
-        $extension = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
-        
-        // Extract components for filename
-        $author = trim($metadata['author'] ?? '');
-        $title = trim($metadata['title'] ?? '');
-        $publicationDate = trim($metadata['publication_date'] ?? '');
-        
-        // Extract year from publication_date (YYYY-MM-DD format)
-        $year = '';
-        if (!empty($publicationDate)) {
-            // Extract year from YYYY-MM-DD format
-            if (preg_match('/^(\d{4})-/', $publicationDate, $matches)) {
-                $year = $matches[1];
-            }
-        }
-        
-        // Build filename components
-        $filenameParts = [];
-        
-        if (!empty($title)) {
-            $filenameParts[] = $this->sanitizeFilename($title);
-        }
-        
-        if (!empty($author)) {
-            $filenameParts[] = $this->sanitizeFilename($author);
-        }
-        
-        // If we have no author or title, use original filename without extension
-        if (empty($filenameParts)) {
-            $filenameParts[] = pathinfo($originalFilename, PATHINFO_FILENAME);
-        }
-        
-        // Join with " - " and add year if available
-        $filename = implode(' - ', $filenameParts);
-        
-        if (!empty($year)) {
-            $filename .= " ($year)";
-        }
-        
-        return $filename . '.' . $extension;
-    }
-
-    /**
-     * Sanitize string for use in filename
-     */
-    private function sanitizeFilename($string) {
-        // Remove or replace invalid filename characters
-        $invalid = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-        $string = str_replace($invalid, '', $string);
-        
-        // Replace multiple spaces with single space
-        $string = preg_replace('/\s+/', ' ', $string);
-        
-        // Trim and limit length
-        $string = trim($string);
-        if (strlen($string) > 100) {
-            $string = substr($string, 0, 100);
-            $string = trim($string);
-        }
-        
-        return $string;
-    }
 
     /**
      * Find a file by its path within a folder (recursive search)

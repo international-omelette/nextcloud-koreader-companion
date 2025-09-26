@@ -10,8 +10,8 @@ return [
         ['name' => 'page#deleteBook', 'url' => '/books/{id}', 'verb' => 'DELETE'],
         ['name' => 'settings#getSettings', 'url' => '/settings', 'verb' => 'GET'],
         ['name' => 'settings#setFolder', 'url' => '/settings/folder', 'verb' => 'PUT'],
-        ['name' => 'settings#setRestrictUploads', 'url' => '/settings/restrict-uploads', 'verb' => 'PUT'],
         ['name' => 'settings#setAutoRename', 'url' => '/settings/auto-rename', 'verb' => 'PUT'],
+        ['name' => 'settings#batchRename', 'url' => '/settings/batch-rename', 'verb' => 'POST'],
         
         // OPDS endpoints
         ['name' => 'opds#index', 'url' => '/opds', 'verb' => 'GET'],
