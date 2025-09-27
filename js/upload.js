@@ -409,53 +409,83 @@
     function showMetadataModal(file) {
         // Show the modal first with loading state
         metadataModal.style.display = 'flex';
-        
+
         // Hide delete button for new entries (only show for editing existing books)
         const deleteButton = document.getElementById('delete-metadata');
         if (deleteButton) {
             deleteButton.style.display = 'none';
         }
-        
+
         // Show loading indicator
         const titleField = document.getElementById('book-title');
         if (titleField) {
             titleField.value = 'Extracting metadata...';
             titleField.disabled = true;
         }
-        
-        // Extract metadata from file content
-        if (window.MetadataExtractor) {
-            window.MetadataExtractor.extractMetadataFromFile(file).then(metadata => {
-                // Populate form with extracted metadata
-                populateForm(metadata, file);
-                
-                // Enable fields and focus on title field
-                if (titleField) {
-                    titleField.disabled = false;
-                    titleField.focus();
-                }
-            }).catch(error => {
-                // Fallback to filename parsing
-                const metadata = extractMetadataFromFilename(file);
-                populateForm(metadata, file);
-                
-                if (titleField) {
-                    titleField.disabled = false;
-                    titleField.focus();
-                }
-                
-                showNotification('Could not extract metadata from file, using filename parsing', 'warning');
-            });
-        } else {
-            // Fallback to filename parsing if MetadataExtractor not loaded
-            const metadata = extractMetadataFromFilename(file);
+
+        // Extract metadata using server-side endpoint
+        extractMetadataFromServer(file).then(metadata => {
+            // Populate form with extracted metadata
             populateForm(metadata, file);
-            
+
+            // Enable fields and focus on title field
             if (titleField) {
                 titleField.disabled = false;
                 titleField.focus();
             }
-        }
+        }).catch(error => {
+            // Fallback to filename parsing
+            const metadata = extractMetadataFromFilename(file);
+            populateForm(metadata, file);
+
+            if (titleField) {
+                titleField.disabled = false;
+                titleField.focus();
+            }
+
+            showNotification('Could not extract metadata from file, using filename parsing', 'warning');
+        });
+    }
+
+    function extractMetadataFromServer(file) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success && response.metadata) {
+                            resolve(response.metadata);
+                        } else {
+                            reject(new Error('Failed to extract metadata: ' + (response.error || 'Unknown error')));
+                        }
+                    } catch (e) {
+                        reject(new Error('Error parsing metadata response'));
+                    }
+                } else {
+                    reject(new Error(`Server error: ${xhr.status}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error extracting metadata'));
+            });
+
+            // Use the extract metadata endpoint
+            const appUrl = OC.generateUrl('/apps/koreader_companion/extract-metadata');
+            xhr.open('POST', appUrl);
+
+            // Add CSRF token if available
+            if (window.OC && window.OC.requestToken) {
+                xhr.setRequestHeader('requesttoken', window.OC.requestToken);
+            }
+
+            xhr.send(formData);
+        });
     }
 
     function hideMetadataModal() {
@@ -626,7 +656,7 @@
 
         // Upload via our app's API endpoint
         const xhr = new XMLHttpRequest();
-        
+
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const percentComplete = (e.loaded / e.total) * 100;
@@ -640,7 +670,7 @@
                     const response = JSON.parse(xhr.responseText);
                     if (response.success) {
                         updateUploadStatus(filename, 'completed');
-                        
+
                         // Move to next file after a short delay
                         setTimeout(() => {
                             hideMetadataModal();
@@ -666,11 +696,9 @@
             showNotification(`Network error uploading ${filename}`, 'error');
         });
 
-        // Get the app's base URL
-        const appUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-        
-        // Upload via our custom endpoint
-        xhr.open('POST', `${appUrl}/upload`);
+        // Use the upload endpoint
+        const appUrl = OC.generateUrl('/apps/koreader_companion/upload');
+        xhr.open('POST', appUrl);
         
         // Add CSRF token if available
         if (window.OC && window.OC.requestToken) {

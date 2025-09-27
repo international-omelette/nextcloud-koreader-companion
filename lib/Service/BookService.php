@@ -382,7 +382,7 @@ class BookService {
 
     private function extractMetadata(Node $file) {
         $extension = strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION));
-        
+
         $metadata = [
             'id' => $file->getId(),
             'name' => $file->getName(),
@@ -417,8 +417,7 @@ class BookService {
                 }
             }
         } else {
-            // Fallback to server-side metadata extraction only if no stored metadata exists
-            // This handles files that were uploaded before the client-side extraction was implemented
+            // Extract metadata from file using server-side parsers
             if ($extension === 'epub') {
                 $this->extractEpubMetadata($file, $metadata);
             } elseif ($extension === 'pdf') {
@@ -440,6 +439,53 @@ class BookService {
 
         // Add KOReader sync progress information
         $this->addSyncProgressToMetadata($file, $metadata);
+
+        return $metadata;
+    }
+
+    /**
+     * Extract metadata for display and editing (used in upload workflow)
+     * Returns raw extracted metadata without progress information
+     */
+    public function extractMetadataForUpload(Node $file): array {
+        $extension = strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION));
+
+        $metadata = [
+            'title' => pathinfo($file->getName(), PATHINFO_FILENAME),
+            'author' => '',
+            'description' => '',
+            'language' => '',
+            'publisher' => '',
+            'publication_date' => '',
+            'subject' => '',
+            'series' => '',
+            'issue' => '',
+            'volume' => '',
+            'tags' => '',
+            'format' => $extension
+        ];
+
+        try {
+            // Extract metadata from file based on format
+            if ($extension === 'epub') {
+                $this->extractEpubMetadata($file, $metadata);
+            } elseif ($extension === 'pdf') {
+                $this->extractPdfMetadata($file, $metadata);
+            } elseif ($extension === 'cbr') {
+                if (class_exists('Kiwilan\Archive\Archive')) {
+                    $this->extractCbrMetadata($file, $metadata);
+                } else {
+                    // Fallback: basic filename metadata for CBR
+                    $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
+                    $metadata['title'] = $filename;
+                }
+            } elseif ($extension === 'mobi') {
+                $this->extractMobiMetadata($file, $metadata);
+            }
+        } catch (\Exception $e) {
+            // If extraction fails, keep the filename-based defaults
+            error_log('eBooks app: Metadata extraction failed for ' . $file->getPath() . ': ' . $e->getMessage());
+        }
 
         return $metadata;
     }

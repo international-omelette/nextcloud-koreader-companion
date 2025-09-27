@@ -1,7 +1,6 @@
 <?php
 style('koreader_companion', 'books');
 script('koreader_companion', 'koreader');
-script('koreader_companion', 'metadata-extractor');
 script('koreader_companion', 'upload');
 
 /** @var \OCP\IL10N $l */

@@ -223,25 +223,51 @@ class PageController extends Controller {
                 return new JSONResponse(['error' => 'No file uploaded'], Http::STATUS_BAD_REQUEST);
             }
 
-            // Get publication year and convert to date format
+            // Get the user's configured eBooks folder
+            $user = $this->userSession->getUser();
+            if (!$user) {
+                return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
+            }
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+
+            // Use the configured folder name
+            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
+
+            try {
+                $booksFolder = $userFolder->get($folderName);
+            } catch (\OCP\Files\NotFoundException $e) {
+                // Create folder if it doesn't exist
+                $booksFolder = $userFolder->newFolder($folderName);
+            }
+
+            // Upload the file first
+            $originalFilename = $uploadedFiles['name'];
+            $tempFilename = 'temp_' . time() . '_' . $originalFilename;
+            $tempFile = $booksFolder->newFile($tempFilename);
+            $tempFile->putContent(file_get_contents($uploadedFiles['tmp_name']));
+
+            // Extract metadata from the uploaded file
+            $extractedMetadata = $this->bookService->extractMetadataForUpload($tempFile);
+
+            // Get user-provided metadata from request
             $publicationYear = $this->request->getParam('publication_date', '');
-            
+
             // Validate publication year (must be 4-digit year or empty)
             if (!empty($publicationYear) && (!is_numeric($publicationYear) || strlen($publicationYear) !== 4 || intval($publicationYear) < 1000 || intval($publicationYear) > 2099)) {
+                $tempFile->delete(); // Clean up temp file
                 return new JSONResponse(['error' => 'Publication year must be a 4-digit year (1000-2099)'], Http::STATUS_BAD_REQUEST);
             }
-            
+
             // Convert year to publication_date format (YYYY-MM-DD)
             $publicationDate = null;
             if (!empty($publicationYear)) {
                 $publicationDate = $publicationYear . '-01-01'; // Default to January 1st
             }
 
-            // Get metadata from request
-            $metadata = [
+            // Merge extracted metadata with user-provided metadata (user data takes precedence)
+            $finalMetadata = array_merge($extractedMetadata, array_filter([
                 'title' => $this->request->getParam('title', ''),
                 'author' => $this->request->getParam('author', ''),
-                'format' => $this->request->getParam('format', ''),
                 'language' => $this->request->getParam('language', ''),
                 'publisher' => $this->request->getParam('publisher', ''),
                 'publication_date' => $publicationDate,
@@ -250,54 +276,77 @@ class PageController extends Controller {
                 'series' => $this->request->getParam('series', ''),
                 'issue' => $this->request->getParam('issue', ''),
                 'volume' => $this->request->getParam('volume', '')
-            ];
+            ], function($value) { return $value !== ''; }));
 
-            // Get the user's configured eBooks folder
+            // Check if auto-rename is enabled for this user
+            $autoRename = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'auto_rename', 'no');
+
+            if ($autoRename === 'yes') {
+                // Generate standardized filename based on final metadata
+                $finalFilename = $this->filenameService->generateStandardFilename($finalMetadata, $originalFilename);
+            } else {
+                // Keep original filename
+                $finalFilename = $originalFilename;
+            }
+
+            // Check for conflicts and resolve with auto-renaming
+            $finalFilename = $this->filenameService->resolveFilenameConflict($booksFolder, $finalFilename);
+
+            // Move temp file to final location with final filename
+            $finalPath = $booksFolder->getPath() . '/' . $finalFilename;
+            $tempFile->move($finalPath);
+
+            // Get the final file reference
+            $finalFile = $booksFolder->get($finalFilename);
+
+            // Store final metadata in database
+            $this->storeBookMetadata($finalFile, $finalMetadata);
+
+            return new JSONResponse([
+                'success' => true,
+                'filename' => $finalFilename,
+                'path' => $finalPath,
+                'extracted_metadata' => $extractedMetadata
+            ]);
+
+        } catch (\Exception $e) {
+            return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function extractMetadata() {
+        try {
+            // Get the uploaded file
+            $uploadedFiles = $this->request->getUploadedFile('file');
+            if (!$uploadedFiles || !isset($uploadedFiles['tmp_name'])) {
+                return new JSONResponse(['error' => 'No file uploaded'], Http::STATUS_BAD_REQUEST);
+            }
+
+            // Get user and folder
             $user = $this->userSession->getUser();
             if (!$user) {
                 return new JSONResponse(['error' => 'Not logged in'], Http::STATUS_UNAUTHORIZED);
             }
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            
-            // Use the configured folder name
-            $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
-            
-            try {
-                $booksFolder = $userFolder->get($folderName);
-            } catch (\OCP\Files\NotFoundException $e) {
-                // Create folder if it doesn't exist
-                $booksFolder = $userFolder->newFolder($folderName);
-            }
 
-            // Check if auto-rename is enabled for this user
-            $autoRename = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'auto_rename', 'no');
+            // Create temporary file for metadata extraction
+            $tempFilename = 'temp_extract_' . time() . '_' . $uploadedFiles['name'];
+            $tempFile = $userFolder->newFile($tempFilename);
+            $tempFile->putContent(file_get_contents($uploadedFiles['tmp_name']));
 
-            $originalFilename = $uploadedFiles['name'];
-            if ($autoRename === 'yes') {
-                // Generate standardized filename based on metadata
-                $filename = $this->filenameService->generateStandardFilename($metadata, $originalFilename);
-            } else {
-                // Keep original filename
-                $filename = $originalFilename;
-            }
-            
-            // Check for conflicts and resolve with auto-renaming
-            $filename = $this->filenameService->resolveFilenameConflict($booksFolder, $filename);
-            
-            $targetPath = $booksFolder->getPath() . '/' . $filename;
+            // Extract metadata
+            $metadata = $this->bookService->extractMetadataForUpload($tempFile);
 
-            // Upload the file
-            $newFile = $booksFolder->newFile($filename);
-            $newFile->putContent(file_get_contents($uploadedFiles['tmp_name']));
-
-
-            // Store metadata (implement this based on your metadata storage system)
-            $this->storeBookMetadata($newFile, $metadata);
+            // Clean up temporary file
+            $tempFile->delete();
 
             return new JSONResponse([
                 'success' => true,
-                'filename' => $filename,
-                'path' => $targetPath
+                'metadata' => $metadata
             ]);
 
         } catch (\Exception $e) {
