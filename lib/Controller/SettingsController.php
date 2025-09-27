@@ -139,19 +139,23 @@ class SettingsController extends Controller {
     }
 
     /**
-     * Process batch rename immediately using chunked processing
+     * Process batch rename immediately using optimized chunked processing
      */
     private function processBatchRenameImmediate(string $userId, $userFolder, int $totalBooks): JSONResponse {
         $renamedCount = 0;
         $processedCount = 0;
         $chunkSize = 100;
 
+        // OPTIMIZATION: Sync filesystem metadata ONCE at start of batch operation
+        // This eliminates 50+ redundant filesystem scans
+        $this->bookService->ensureMetadataUpToDate($userId);
+
         // Process books in chunks to handle medium libraries efficiently
         $totalPages = ceil($totalBooks / $chunkSize);
 
         for ($page = 1; $page <= $totalPages; $page++) {
-            // Get chunk of books with metadata from database
-            $books = $this->bookService->getBooks($page, $chunkSize);
+            // Get chunk of books with metadata from database (skip metadata update)
+            $books = $this->bookService->getBooks($page, $chunkSize, 'title', true);
 
             if (empty($books)) {
                 continue; // Skip if database approach fails for this chunk
@@ -189,9 +193,9 @@ class SettingsController extends Controller {
                 }
             }
 
-            // Small delay between chunks to be gentle on the system
+            // Reduced delay between chunks since we eliminated the filesystem scanning overhead
             if ($page < $totalPages) {
-                usleep(10000); // 10ms delay between chunks
+                usleep(500000); // 0.5s delay between chunks
             }
         }
 

@@ -35,10 +35,10 @@ class BookService {
     /**
      * Get paginated books from database with optional sorting
      */
-    public function getBooks($page = null, $perPage = null, $sort = 'title') {
+    public function getBooks($page = null, $perPage = null, $sort = 'title', $skipMetadataUpdate = false) {
         // If pagination parameters are provided, use database-based pagination
         if ($page !== null && $perPage !== null) {
-            return $this->getPaginatedBooks($page, $perPage, $sort);
+            return $this->getPaginatedBooks($page, $perPage, $sort, $skipMetadataUpdate);
         }
         
         // Otherwise, maintain backward compatibility with file-system scanning
@@ -75,7 +75,7 @@ class BookService {
     /**
      * Get paginated books from database and file system
      */
-    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title') {
+    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title', $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -83,9 +83,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // First, ensure metadata is up to date by scanning for new files
-        $this->ensureMetadataUpToDate($userId);
+
+        // First, ensure metadata is up to date by scanning for new files (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         // Now query database for paginated results
         try {
@@ -170,7 +172,7 @@ class BookService {
     /**
      * Ensure metadata database is up to date by scanning filesystem
      */
-    private function ensureMetadataUpToDate($userId) {
+    public function ensureMetadataUpToDate($userId) {
         try {
             $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
             $userFolder = $this->rootFolder->getUserFolder($userId);
