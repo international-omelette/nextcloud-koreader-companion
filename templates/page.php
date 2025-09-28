@@ -256,6 +256,14 @@ script('koreader_companion', 'upload');
                             </div>
                         </div>
                     </div>
+
+                    <!-- Progress indicator -->
+                    <div id="batch-progress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">Processing...</div>
+                    </div>
                 </div>
             </div>
         </div>

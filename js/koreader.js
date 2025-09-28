@@ -1278,10 +1278,13 @@ function checkAutoRenameChange() {
 }
 
 function confirmAutoRename() {
-    // Show loading state
-    $('#confirm-auto-rename-btn').prop('disabled', true).text('Processing...');
+    // Show progress bar and disable buttons and checkbox
+    $('#confirm-auto-rename-btn').prop('disabled', true).text('Starting...');
+    $('#cancel-auto-rename-btn').prop('disabled', true);
+    $('#auto-rename').prop('disabled', true);
+    $('#batch-progress').show();
 
-    // Enable auto-rename and trigger batch rename
+    // Start the batch rename operation
     $.ajax({
         url: OC.generateUrl('/apps/koreader_companion/settings/batch-rename'),
         method: 'POST',
@@ -1289,36 +1292,97 @@ function confirmAutoRename() {
     })
     .done(function(response) {
         originalAutoRenameValue = true;
-        $('#auto-rename-confirmation').hide();
-
-        // Show success message and suggest reload
-        OC.Notification.showTemporary(
-            `Successfully renamed ${response.renamed_count} books to standardized format.`
-        );
-
-        setTimeout(() => {
-            if (confirm('Books have been renamed. Would you like to reload the page to see the updated filenames?')) {
-                location.reload();
-            }
-        }, 1500);
+        // Don't hide confirmation yet - let polling handle completion
     })
     .fail(function(xhr) {
-        const error = xhr.responseJSON?.error || 'Failed to enable auto-rename';
+        const error = xhr.responseJSON?.error || 'Failed to start batch rename';
         OC.Notification.showTemporary(error);
 
-        // Revert checkbox state
+        // Reset UI state
+        $('#batch-progress').hide();
         $('#auto-rename').prop('checked', originalAutoRenameValue);
         $('#auto-rename-confirmation').hide();
-    })
-    .always(function() {
         $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+        $('#cancel-auto-rename-btn').prop('disabled', false);
     });
+
+    // Start polling for progress
+    startProgressPolling();
+}
+
+let progressPollingInterval = null;
+
+function startProgressPolling() {
+    // Clear any existing polling
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+    }
+
+    // Poll every 2 seconds for progress updates
+    progressPollingInterval = setInterval(function() {
+        $.ajax({
+            url: OC.generateUrl('/apps/koreader_companion/settings/batch-rename-progress'),
+            method: 'GET'
+        })
+        .done(function(progress) {
+            updateProgressDisplay(progress);
+
+            // Check if completed
+            if (progress.percent >= 100 && progress.status === 'Completed') {
+                clearInterval(progressPollingInterval);
+                progressPollingInterval = null;
+                handleBatchRenameComplete(progress);
+            }
+        })
+        .fail(function() {
+            // If polling fails, stop polling and reset UI
+            clearInterval(progressPollingInterval);
+            progressPollingInterval = null;
+            $('#batch-progress').hide();
+            $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+            $('#cancel-auto-rename-btn').prop('disabled', false);
+        });
+    }, 2000);
+}
+
+function updateProgressDisplay(progress) {
+    $('.progress-fill').css('width', progress.percent + '%');
+    $('.progress-text').text(progress.status);
+}
+
+function handleBatchRenameComplete(progress) {
+    // Hide progress and reset UI
+    $('#batch-progress').hide();
+    $('#auto-rename-confirmation').hide();
+    $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+    $('#cancel-auto-rename-btn').prop('disabled', false);
+
+    // Show success message
+    OC.Notification.showTemporary(
+        `Successfully renamed ${progress.renamed_count} of ${progress.total_books} books to standardized format.`
+    );
+
+    // Auto-reload page to show updated filenames
+    setTimeout(() => {
+        location.reload();
+    }, 1500);
 }
 
 function cancelAutoRename() {
+    // Stop any ongoing progress polling
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+        progressPollingInterval = null;
+    }
+
     // Revert checkbox to original state
     $('#auto-rename').prop('checked', originalAutoRenameValue);
     $('#auto-rename-confirmation').hide();
+    $('#batch-progress').hide();
+
+    // Reset button states
+    $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+    $('#cancel-auto-rename-btn').prop('disabled', false);
 }
 
 function saveAutoRenameSetting(enabled) {

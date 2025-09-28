@@ -13,6 +13,7 @@ return [
         ['name' => 'settings#setFolder', 'url' => '/settings/folder', 'verb' => 'PUT'],
         ['name' => 'settings#setAutoRename', 'url' => '/settings/auto-rename', 'verb' => 'PUT'],
         ['name' => 'settings#batchRename', 'url' => '/settings/batch-rename', 'verb' => 'POST'],
+        ['name' => 'settings#getBatchRenameProgress', 'url' => '/settings/batch-rename-progress', 'verb' => 'GET'],
         
         // OPDS endpoints
         ['name' => 'opds#index', 'url' => '/opds', 'verb' => 'GET'],

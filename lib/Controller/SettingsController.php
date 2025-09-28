@@ -146,9 +146,14 @@ class SettingsController extends Controller {
         $processedCount = 0;
         $chunkSize = 100;
 
+        // Initialize progress tracking
+        $this->updateBatchRenameProgress($userId, 0, 0, $totalBooks, 'Starting batch rename...');
+
         // OPTIMIZATION: Sync filesystem metadata ONCE at start of batch operation
         // This eliminates 50+ redundant filesystem scans
         $this->bookService->ensureMetadataUpToDate($userId);
+
+        $this->updateBatchRenameProgress($userId, 5, 0, $totalBooks, 'Scanning library...');
 
         // Process books in chunks to handle medium libraries efficiently
         $totalPages = ceil($totalBooks / $chunkSize);
@@ -193,11 +198,19 @@ class SettingsController extends Controller {
                 }
             }
 
+            // Update progress after each chunk
+            $percent = 5 + (($page / $totalPages) * 90); // 5% for initial scan + 90% for processing
+            $status = "Processing $processedCount/$totalBooks books... ($renamedCount renamed)";
+            $this->updateBatchRenameProgress($userId, $percent, $renamedCount, $totalBooks, $status);
+
             // Reduced delay between chunks since we eliminated the filesystem scanning overhead
             if ($page < $totalPages) {
                 usleep(500000); // 0.5s delay between chunks
             }
         }
+
+        // Mark operation as completed
+        $this->updateBatchRenameProgress($userId, 100, $renamedCount, $totalBooks, 'Completed');
 
         return new JSONResponse([
             'status' => 'success',
@@ -223,6 +236,47 @@ class SettingsController extends Controller {
             'folder' => $this->config->getUserValue($userId, $this->appName, 'folder', 'eBooks'),
             'auto_rename' => $this->config->getUserValue($userId, $this->appName, 'auto_rename', 'no')
         ]);
+    }
+
+    /**
+     * Update batch rename progress for user
+     */
+    private function updateBatchRenameProgress(string $userId, float $percent, int $renamed, int $total, string $status) {
+        $progressData = [
+            'percent' => round($percent, 1),
+            'renamed_count' => $renamed,
+            'total_books' => $total,
+            'status' => $status,
+            'timestamp' => time()
+        ];
+
+        $this->config->setUserValue($userId, $this->appName, 'batch_rename_progress', json_encode($progressData));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getBatchRenameProgress() {
+        $user = $this->getAuthenticatedUser();
+        if ($user instanceof JSONResponse) {
+            return $user;
+        }
+
+        $userId = $user->getUID();
+        $progressJson = $this->config->getUserValue($userId, $this->appName, 'batch_rename_progress', '{}');
+        $progress = json_decode($progressJson, true) ?: [];
+
+        // Add default values if not set
+        $progress = array_merge([
+            'percent' => 0,
+            'renamed_count' => 0,
+            'total_books' => 0,
+            'status' => 'Ready',
+            'timestamp' => time()
+        ], $progress);
+
+        return new JSONResponse($progress);
     }
 
     /**
