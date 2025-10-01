@@ -27,6 +27,10 @@ class SettingsController extends Controller {
         $this->db = $db;
         $this->bookService = $bookService;
         $this->rootFolder = $rootFolder;
+
+        if (!$filenameService) {
+            throw new \Exception('FilenameService not available - required for filename operations');
+        }
         $this->filenameService = $filenameService;
     }
 
@@ -64,7 +68,7 @@ class SettingsController extends Controller {
         if ($isFolderChanging) {
             $cleared = $this->clearLibraryMetadata($userId);
             return new JSONResponse([
-                'status' => 'success',
+                'success' => true,
                 'folder_changed' => true,
                 'cleared' => $cleared,
                 'message' => $cleared > 0 ? "Folder updated and library cleared. {$cleared} books will need to be re-indexed." : 'Folder updated.'
@@ -72,7 +76,7 @@ class SettingsController extends Controller {
         }
 
         return new JSONResponse([
-            'status' => 'success',
+            'success' => true,
             'folder_changed' => false
         ]);
     }
@@ -91,7 +95,7 @@ class SettingsController extends Controller {
         $value = ($auto_rename === 'yes') ? 'yes' : 'no';
 
         $this->config->setUserValue($user->getUID(), $this->appName, 'auto_rename', $value);
-        return new JSONResponse(['status' => 'success']);
+        return new JSONResponse(['success' => true]);
     }
 
     /**
@@ -124,7 +128,7 @@ class SettingsController extends Controller {
 
             if ($totalBooks === 0) {
                 return new JSONResponse([
-                    'status' => 'success',
+                    'success' => true,
                     'renamed_count' => 0,
                     'total_books' => 0
                 ]);
@@ -213,7 +217,7 @@ class SettingsController extends Controller {
         $this->updateBatchRenameProgress($userId, 100, $renamedCount, $totalBooks, 'Completed');
 
         return new JSONResponse([
-            'status' => 'success',
+            'success' => true,
             'renamed_count' => $renamedCount,
             'total_books' => $totalBooks,
             'processed_count' => $processedCount,

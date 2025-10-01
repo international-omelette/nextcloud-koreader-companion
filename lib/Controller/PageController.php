@@ -38,7 +38,12 @@ class PageController extends Controller {
     ) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
+
+        if (!$filenameService) {
+            throw new \Exception('FilenameService not available - required for file operations');
+        }
         $this->filenameService = $filenameService;
+
         $this->config = $config;
         $this->userSession = $userSession;
         $this->urlGenerator = $urlGenerator;
