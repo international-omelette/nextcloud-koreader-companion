@@ -1037,42 +1037,45 @@ let navigationOpen = false;
 function toggleNavigation(e) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const body = document.body;
     const nav = document.getElementById('app-navigation');
-    
+
     // Check current state to ensure sync
     const isCurrentlyOpen = body.classList.contains('navigation-open');
     navigationOpen = !isCurrentlyOpen;
-    
+
     if (navigationOpen) {
         // Opening - force immediate start of transition
         nav.style.transition = 'none';
         nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
         body.classList.add('navigation-open');
+        nav.inert = false;
     } else {
         // Closing - force immediate start of transition
         nav.style.transition = 'none';
         nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
         body.classList.remove('navigation-open');
+        nav.inert = true;
     }
 }
 
 function closeNavigation() {
     const body = document.body;
     const nav = document.getElementById('app-navigation');
-    
+
     if (body.classList.contains('navigation-open')) {
         // Force immediate start of close transition
         nav.style.transition = 'none';
         nav.offsetHeight;
         nav.style.transition = 'transform 0.3s ease';
-        
+
         // Close navigation
         navigationOpen = false;
         body.classList.remove('navigation-open');
+        nav.inert = true;
     }
 }
 

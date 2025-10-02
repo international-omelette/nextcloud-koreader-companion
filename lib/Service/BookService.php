@@ -138,7 +138,7 @@ class BookService {
     /**
      * Get total count of books for pagination
      */
-    public function getTotalBookCount() {
+    public function getTotalBookCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -146,8 +146,10 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date first
-        $this->ensureMetadataUpToDate($userId);
+        // Ensure metadata is up to date first (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -171,16 +173,16 @@ class BookService {
 
     /**
      * Ensure metadata database is up to date by scanning filesystem
+     * Optimized to load all metadata in one query instead of per-file queries
      */
     public function ensureMetadataUpToDate($userId) {
         try {
             $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
             $userFolder = $this->rootFolder->getUserFolder($userId);
-            
+
             try {
                 $booksFolder = $userFolder->get($folderName);
             } catch (\Exception $e) {
-                // Folder doesn't exist, nothing to sync
                 return;
             }
 
@@ -188,64 +190,92 @@ class BookService {
                 return;
             }
 
-            // Scan files and update database metadata
-            $this->syncFolderToDatabase($booksFolder, $userId);
+            $existingMetadata = $this->loadExistingMetadata($userId);
 
-            // Clean up orphaned database entries (files that no longer exist)
+            $this->syncFolderToDatabase($booksFolder, $userId, $existingMetadata);
+
             $this->cleanupOrphanedMetadata($userId);
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to update metadata: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Sync folder contents to database metadata
-     */
-    private function syncFolderToDatabase(Node $folder, $userId) {
+    private function loadExistingMetadata(string $userId): array {
+        try {
+            $qb = $this->db->getQueryBuilder();
+            $result = $qb->select('id', 'file_id', 'updated_at')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                ->executeQuery();
+
+            $metadata = [];
+            while ($row = $result->fetch()) {
+                $metadata[$row['file_id']] = [
+                    'id' => $row['id'],
+                    'updated_at' => $row['updated_at']
+                ];
+            }
+            $result->closeCursor();
+
+            return $metadata;
+        } catch (\Exception $e) {
+            error_log('eBooks app: Failed to load existing metadata: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function syncFileMetadata(Node $file, string $userId): void {
+        $this->ensureFileInDatabase($file, $userId);
+    }
+
+    private function syncFolderToDatabase(Node $folder, string $userId, array &$existingMetadata) {
         foreach ($folder->getDirectoryListing() as $node) {
             if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
-                $this->syncFolderToDatabase($node, $userId);
+                $this->syncFolderToDatabase($node, $userId, $existingMetadata);
             } else {
                 $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
                 if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    $this->ensureFileInDatabase($node, $userId);
+                    $this->ensureFileInDatabase($node, $userId, $existingMetadata);
                 }
             }
         }
     }
 
-    /**
-     * Ensure a file is recorded in the database metadata table
-     */
-    private function ensureFileInDatabase(Node $file, $userId) {
+    private function ensureFileInDatabase(Node $file, string $userId, array &$existingMetadata = null) {
         try {
-            // Check if file already exists in database
-            $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('id', 'updated_at')
-                ->from('koreader_metadata')
-                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($file->getId())))
-                ->executeQuery();
-                
-            $existingRow = $result->fetch();
-            $result->closeCursor();
-            
+            $fileId = $file->getId();
             $fileModTime = $file->getMTime();
-            
-            if ($existingRow) {
-                // Check if file has been modified since last metadata extraction
-                $lastUpdated = new \DateTime($existingRow['updated_at']);
+
+            if ($existingMetadata !== null && isset($existingMetadata[$fileId])) {
+                $metadata = $existingMetadata[$fileId];
+                $lastUpdated = new \DateTime($metadata['updated_at']);
                 if ($fileModTime <= $lastUpdated->getTimestamp()) {
-                    // File hasn't changed, no need to update
                     return;
                 }
-                // Update existing record
-                $this->updateFileMetadata($file, $userId, $existingRow['id']);
-            } else {
-                // Insert new record
+                $this->updateFileMetadata($file, $userId, $metadata['id']);
+            } elseif ($existingMetadata !== null) {
                 $this->insertFileMetadata($file, $userId);
+            } else {
+                $qb = $this->db->getQueryBuilder();
+                $result = $qb->select('id', 'updated_at')
+                    ->from('koreader_metadata')
+                    ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                    ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId)))
+                    ->executeQuery();
+
+                $existingRow = $result->fetch();
+                $result->closeCursor();
+
+                if ($existingRow) {
+                    $lastUpdated = new \DateTime($existingRow['updated_at']);
+                    if ($fileModTime <= $lastUpdated->getTimestamp()) {
+                        return;
+                    }
+                    $this->updateFileMetadata($file, $userId, $existingRow['id']);
+                } else {
+                    $this->insertFileMetadata($file, $userId);
+                }
             }
-            
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to ensure file in database ' . $file->getPath() . ': ' . $e->getMessage());
         }
@@ -894,10 +924,10 @@ class BookService {
         }
     }
 
-    public function searchBooks($query, $page = null, $perPage = null) {
+    public function searchBooks($query, $page = null, $perPage = null, $skipMetadataUpdate = false) {
         // If pagination parameters are provided, use database-based search
         if ($page !== null && $perPage !== null) {
-            return $this->getPaginatedSearchResults($query, $page, $perPage);
+            return $this->getPaginatedSearchResults($query, $page, $perPage, $skipMetadataUpdate);
         }
         
         // Otherwise, maintain backward compatibility with in-memory search
@@ -924,7 +954,7 @@ class BookService {
     /**
      * Get paginated search results from database
      */
-    private function getPaginatedSearchResults($query, $page = 1, $perPage = 20) {
+    private function getPaginatedSearchResults($query, $page = 1, $perPage = 20, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -932,9 +962,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
 
         if (empty($query)) {
             return $this->getPaginatedBooks($page, $perPage);
@@ -982,19 +1014,21 @@ class BookService {
     /**
      * Get total count of search results for pagination
      */
-    public function getSearchResultCount($query) {
+    public function getSearchResultCount($query, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         if (empty($query)) {
-            return $this->getTotalBookCount();
+            return $this->getTotalBookCount($skipMetadataUpdate);
         }
         
         try {
@@ -1500,9 +1534,6 @@ class BookService {
             $this->cleanupBookReferences($metadataId, $userId);
         }
 
-        // Clean up file tracking
-        $this->fileTrackingService->removeFileTracking($fileId, $userId);
-
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->delete('koreader_metadata')
@@ -1692,7 +1723,7 @@ class BookService {
     /**
      * Get authors with book counts for faceted browsing
      */
-    public function getAuthors($page = 1, $perPage = 50) {
+    public function getAuthors($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -1700,9 +1731,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -1726,31 +1759,36 @@ class BookService {
     /**
      * Get total count of unique authors
      */
-    public function getAuthorsCount() {
+    public function getAuthorsCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         try {
             $qb = $this->db->getQueryBuilder();
-            $subQuery = $this->db->getQueryBuilder();
-            
-            $subQuery->selectDistinct('author')
-                     ->from('koreader_metadata')
-                     ->where($subQuery->expr()->eq('user_id', $subQuery->createNamedParameter($userId)))
-                     ->andWhere($subQuery->expr()->isNotNull('author'))
-                     ->andWhere($subQuery->expr()->neq('author', $subQuery->createNamedParameter('')));
-            
-            $qb->select($qb->func()->count('*', 'total_count'))
-               ->from('(' . $subQuery->getSQL() . ')', 'authors_count');
-            
-            return (int)$qb->executeQuery()->fetchOne();
+
+            $qb->selectDistinct('author')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+               ->andWhere($qb->expr()->isNotNull('author'))
+               ->andWhere($qb->expr()->neq('author', $qb->createNamedParameter('')));
+
+            $result = $qb->executeQuery();
+            $count = 0;
+            while ($result->fetch()) {
+                $count++;
+            }
+            $result->closeCursor();
+
+            return $count;
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to get authors count: ' . $e->getMessage());
             return 0;
@@ -1842,7 +1880,7 @@ class BookService {
     /**
      * Get series with book counts for faceted browsing
      */
-    public function getSeries($page = 1, $perPage = 50) {
+    public function getSeries($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -1850,9 +1888,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -1876,31 +1916,36 @@ class BookService {
     /**
      * Get total count of unique series
      */
-    public function getSeriesCount() {
+    public function getSeriesCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         try {
             $qb = $this->db->getQueryBuilder();
-            $subQuery = $this->db->getQueryBuilder();
-            
-            $subQuery->selectDistinct('series')
-                     ->from('koreader_metadata')
-                     ->where($subQuery->expr()->eq('user_id', $subQuery->createNamedParameter($userId)))
-                     ->andWhere($subQuery->expr()->isNotNull('series'))
-                     ->andWhere($subQuery->expr()->neq('series', $subQuery->createNamedParameter('')));
-            
-            $qb->select($qb->func()->count('*', 'total_count'))
-               ->from('(' . $subQuery->getSQL() . ')', 'series_count');
-            
-            return (int)$qb->executeQuery()->fetchOne();
+
+            $qb->selectDistinct('series')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+               ->andWhere($qb->expr()->isNotNull('series'))
+               ->andWhere($qb->expr()->neq('series', $qb->createNamedParameter('')));
+
+            $result = $qb->executeQuery();
+            $count = 0;
+            while ($result->fetch()) {
+                $count++;
+            }
+            $result->closeCursor();
+
+            return $count;
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to get series count: ' . $e->getMessage());
             return 0;
@@ -1980,7 +2025,7 @@ class BookService {
     /**
      * Get genres/subjects with book counts for faceted browsing
      */
-    public function getGenres($page = 1, $perPage = 50) {
+    public function getGenres($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -1988,9 +2033,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2014,31 +2061,36 @@ class BookService {
     /**
      * Get total count of unique genres/subjects
      */
-    public function getGenresCount() {
+    public function getGenresCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         try {
             $qb = $this->db->getQueryBuilder();
-            $subQuery = $this->db->getQueryBuilder();
-            
-            $subQuery->selectDistinct('subject')
-                     ->from('koreader_metadata')
-                     ->where($subQuery->expr()->eq('user_id', $subQuery->createNamedParameter($userId)))
-                     ->andWhere($subQuery->expr()->isNotNull('subject'))
-                     ->andWhere($subQuery->expr()->neq('subject', $subQuery->createNamedParameter('')));
-            
-            $qb->select($qb->func()->count('*', 'total_count'))
-               ->from('(' . $subQuery->getSQL() . ')', 'genres_count');
-            
-            return (int)$qb->executeQuery()->fetchOne();
+
+            $qb->selectDistinct('subject')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+               ->andWhere($qb->expr()->isNotNull('subject'))
+               ->andWhere($qb->expr()->neq('subject', $qb->createNamedParameter('')));
+
+            $result = $qb->executeQuery();
+            $count = 0;
+            while ($result->fetch()) {
+                $count++;
+            }
+            $result->closeCursor();
+
+            return $count;
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to get genres count: ' . $e->getMessage());
             return 0;
@@ -2133,7 +2185,7 @@ class BookService {
     /**
      * Get formats with book counts for faceted browsing
      */
-    public function getFormats($page = 1, $perPage = 50) {
+    public function getFormats($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2141,9 +2193,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2167,31 +2221,36 @@ class BookService {
     /**
      * Get total count of unique formats
      */
-    public function getFormatsCount() {
+    public function getFormatsCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         try {
             $qb = $this->db->getQueryBuilder();
-            $subQuery = $this->db->getQueryBuilder();
-            
-            $subQuery->selectDistinct('file_format')
-                     ->from('koreader_metadata')
-                     ->where($subQuery->expr()->eq('user_id', $subQuery->createNamedParameter($userId)))
-                     ->andWhere($subQuery->expr()->isNotNull('file_format'))
-                     ->andWhere($subQuery->expr()->neq('file_format', $subQuery->createNamedParameter('')));
-            
-            $qb->select($qb->func()->count('*', 'total_count'))
-               ->from('(' . $subQuery->getSQL() . ')', 'formats_count');
-            
-            return (int)$qb->executeQuery()->fetchOne();
+
+            $qb->selectDistinct('file_format')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+               ->andWhere($qb->expr()->isNotNull('file_format'))
+               ->andWhere($qb->expr()->neq('file_format', $qb->createNamedParameter('')));
+
+            $result = $qb->executeQuery();
+            $count = 0;
+            while ($result->fetch()) {
+                $count++;
+            }
+            $result->closeCursor();
+
+            return $count;
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to get formats count: ' . $e->getMessage());
             return 0;
@@ -2286,7 +2345,7 @@ class BookService {
     /**
      * Get languages with book counts for faceted browsing
      */
-    public function getLanguages($page = 1, $perPage = 50) {
+    public function getLanguages($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2294,9 +2353,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2320,31 +2381,36 @@ class BookService {
     /**
      * Get total count of unique languages
      */
-    public function getLanguagesCount() {
+    public function getLanguagesCount($skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
-        
+
+        // Ensure metadata is up to date (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
+
         try {
             $qb = $this->db->getQueryBuilder();
-            $subQuery = $this->db->getQueryBuilder();
-            
-            $subQuery->selectDistinct('language')
-                     ->from('koreader_metadata')
-                     ->where($subQuery->expr()->eq('user_id', $subQuery->createNamedParameter($userId)))
-                     ->andWhere($subQuery->expr()->isNotNull('language'))
-                     ->andWhere($subQuery->expr()->neq('language', $subQuery->createNamedParameter('')));
-            
-            $qb->select($qb->func()->count('*', 'total_count'))
-               ->from('(' . $subQuery->getSQL() . ')', 'languages_count');
-            
-            return (int)$qb->executeQuery()->fetchOne();
+
+            $qb->selectDistinct('language')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+               ->andWhere($qb->expr()->isNotNull('language'))
+               ->andWhere($qb->expr()->neq('language', $qb->createNamedParameter('')));
+
+            $result = $qb->executeQuery();
+            $count = 0;
+            while ($result->fetch()) {
+                $count++;
+            }
+            $result->closeCursor();
+
+            return $count;
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to get languages count: ' . $e->getMessage());
             return 0;

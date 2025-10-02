@@ -2,7 +2,6 @@
 namespace OCA\KoreaderCompanion\Controller;
 
 use OCA\KoreaderCompanion\Service\BookService;
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCA\KoreaderCompanion\Service\DocumentHashGenerator;
 use OCA\KoreaderCompanion\Service\FilenameService;
 use OCP\AppFramework\Controller;
@@ -25,7 +24,6 @@ class PageController extends Controller {
     private $urlGenerator;
     private $db;
     private $rootFolder;
-    private $fileTrackingService;
     private $hashGenerator;
     private $filenameService;
 
@@ -39,7 +37,6 @@ class PageController extends Controller {
         IURLGenerator $urlGenerator,
         IDBConnection $db,
         IRootFolder $rootFolder,
-        FileTrackingService $fileTrackingService,
         DocumentHashGenerator $hashGenerator
     ) {
         parent::__construct($appName, $request);
@@ -55,7 +52,6 @@ class PageController extends Controller {
         $this->urlGenerator = $urlGenerator;
         $this->db = $db;
         $this->rootFolder = $rootFolder;
-        $this->fileTrackingService = $fileTrackingService;
         $this->hashGenerator = $hashGenerator;
     }
 
@@ -75,27 +71,28 @@ class PageController extends Controller {
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            // For AJAX requests, use searchBooks for queries, getBooks for empty/no query
-            // This ensures consistent behavior between initial page load and AJAX calls
+            // For AJAX requests, skip metadata updates (performance optimization)
+            // Metadata is updated on initial page load and file uploads
             if (empty($query)) {
-                $books = $this->bookService->getBooks($page, $perPage);
+                $books = $this->bookService->getBooks($page, $perPage, 'title', true);
             } else {
-                $books = $this->bookService->searchBooks($query, $page, $perPage);
+                $books = $this->bookService->searchBooks($query, $page, $perPage, true);
             }
             return new JSONResponse($books);
         }
-        
-        $books = $this->bookService->getBooks($page, $perPage);
-        
+
+        // Initial page load: perform metadata update to ensure fresh data
+        $books = $this->bookService->getBooks($page, $perPage, 'title', false);
+
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
         $opdsUrl = $baseUrl . 'apps/koreader_companion/opds';
         $koreaderSyncUrl = $baseUrl . 'apps/koreader_companion/sync';
-        
+
         $hasKoreaderPassword = false;
         if ($user) {
             $hasKoreaderPassword = !empty($this->config->getUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', ''));
         }
-        
+
         return new TemplateResponse($this->appName, 'page', [
             'books' => $books,
             'user_id' => $user ? $user->getUID() : '',

@@ -18,7 +18,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         initializeUpload();
         initializeModal();
-        initializeEditButtons();
     });
 
     function initializeUpload() {

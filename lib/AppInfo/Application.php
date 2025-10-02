@@ -1,13 +1,16 @@
 <?php
 namespace OCA\KoreaderCompanion\AppInfo;
 
+use OCA\KoreaderCompanion\Listener\FileCreationListener;
 use OCA\KoreaderCompanion\Listener\FileDeleteListener;
 use OCA\KoreaderCompanion\Service\PdfMetadataExtractor;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCP\Files\Events\Node\NodeCreatedEvent;
 use OCP\Files\Events\Node\NodeDeletedEvent;
+use OCP\Files\Events\Node\NodeWrittenEvent;
 use Psr\Log\LoggerInterface;
 
 class Application extends App implements IBootstrap {
@@ -31,9 +34,11 @@ class Application extends App implements IBootstrap {
                 $c->get(LoggerInterface::class)
             );
         });
-        
-        
-        // Register the file delete listener for cleanup when files are deleted from filesystem
+
+
+        // Register file event listeners
+        $context->registerEventListener(NodeCreatedEvent::class, FileCreationListener::class);
+        $context->registerEventListener(NodeWrittenEvent::class, FileCreationListener::class);
         $context->registerEventListener(NodeDeletedEvent::class, FileDeleteListener::class);
     }
 
