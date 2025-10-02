@@ -82,16 +82,16 @@ class PageController extends Controller {
         }
         
         $books = $this->bookService->getBooks($page, $perPage);
-        
+
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
         $opdsUrl = $baseUrl . 'apps/koreader_companion/opds';
         $koreaderSyncUrl = $baseUrl . 'apps/koreader_companion/sync';
-        
+
         $hasKoreaderPassword = false;
         if ($user) {
             $hasKoreaderPassword = !empty($this->config->getUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', ''));
         }
-        
+
         return new TemplateResponse($this->appName, 'page', [
             'books' => $books,
             'user_id' => $user ? $user->getUID() : '',
