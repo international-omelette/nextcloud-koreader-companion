@@ -2,7 +2,6 @@
 namespace OCA\KoreaderCompanion\Controller;
 
 use OCA\KoreaderCompanion\Service\BookService;
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCA\KoreaderCompanion\Service\DocumentHashGenerator;
 use OCA\KoreaderCompanion\Service\FilenameService;
 use OCP\AppFramework\Controller;
@@ -25,7 +24,6 @@ class PageController extends Controller {
     private $urlGenerator;
     private $db;
     private $rootFolder;
-    private $fileTrackingService;
     private $hashGenerator;
     private $filenameService;
 
@@ -39,7 +37,6 @@ class PageController extends Controller {
         IURLGenerator $urlGenerator,
         IDBConnection $db,
         IRootFolder $rootFolder,
-        FileTrackingService $fileTrackingService,
         DocumentHashGenerator $hashGenerator
     ) {
         parent::__construct($appName, $request);
@@ -55,7 +52,6 @@ class PageController extends Controller {
         $this->urlGenerator = $urlGenerator;
         $this->db = $db;
         $this->rootFolder = $rootFolder;
-        $this->fileTrackingService = $fileTrackingService;
         $this->hashGenerator = $hashGenerator;
     }
 

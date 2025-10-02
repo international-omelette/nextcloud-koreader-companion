@@ -176,7 +176,7 @@ class BookService {
         try {
             $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
             $userFolder = $this->rootFolder->getUserFolder($userId);
-            
+
             try {
                 $booksFolder = $userFolder->get($folderName);
             } catch (\Exception $e) {
@@ -196,6 +196,10 @@ class BookService {
         } catch (\Exception $e) {
             error_log('eBooks app: Failed to update metadata: ' . $e->getMessage());
         }
+    }
+
+    public function syncFileMetadata(Node $file, string $userId): void {
+        $this->ensureFileInDatabase($file, $userId);
     }
 
     /**
@@ -1499,9 +1503,6 @@ class BookService {
             // Clean up all related records
             $this->cleanupBookReferences($metadataId, $userId);
         }
-
-        // Clean up file tracking
-        $this->fileTrackingService->removeFileTracking($fileId, $userId);
 
         try {
             $qb = $this->db->getQueryBuilder();
