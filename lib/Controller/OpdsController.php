@@ -80,15 +80,15 @@ class OpdsController extends Controller {
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
         $sort = $this->request->getParam('sort', 'title');
-        
-        $totalCount = $this->bookService->getTotalBookCount();
-        
+
+        $totalCount = $this->bookService->getTotalBookCount(true);
+
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
             return $validationResponse;
         }
-        
-        $books = $this->bookService->getBooks($page, $perPage, $sort);
+
+        $books = $this->bookService->getBooks($page, $perPage, $sort, true);
         $xml = $this->generateRootCatalogXml($books, $page, $perPage, $totalCount, $sort);
         
         $response = new XMLResponse($xml);
@@ -141,15 +141,15 @@ class OpdsController extends Controller {
         $query = $this->request->getParam('q', '');
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 20)));
-        
-        $totalCount = $this->bookService->getSearchResultCount($query);
-        
+
+        $totalCount = $this->bookService->getSearchResultCount($query, true);
+
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount, $query);
         if ($validationResponse !== null) {
             return $validationResponse;
         }
-        
-        $books = $this->bookService->searchBooks($query, $page, $perPage);
+
+        $books = $this->bookService->searchBooks($query, $page, $perPage, true);
         $title = empty($query) ? 'All Books' : 'Search Results: ' . $query;
         $xml = $this->generatePaginatedOpdsXml($books, $page, $perPage, $totalCount, $title, $query);
         
@@ -547,9 +547,9 @@ class OpdsController extends Controller {
         
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
-        
-        $authors = $this->bookService->getAuthors($page, $perPage);
-        $totalCount = $this->bookService->getAuthorsCount();
+
+        $authors = $this->bookService->getAuthors($page, $perPage, true);
+        $totalCount = $this->bookService->getAuthorsCount(true);
         
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
@@ -611,8 +611,8 @@ class OpdsController extends Controller {
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
-        $series = $this->bookService->getSeries($page, $perPage);
-        $totalCount = $this->bookService->getSeriesCount();
+        $series = $this->bookService->getSeries($page, $perPage, true);
+        $totalCount = $this->bookService->getSeriesCount(true);
         
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
@@ -673,8 +673,8 @@ class OpdsController extends Controller {
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
-        $genres = $this->bookService->getGenres($page, $perPage);
-        $totalCount = $this->bookService->getGenresCount();
+        $genres = $this->bookService->getGenres($page, $perPage, true);
+        $totalCount = $this->bookService->getGenresCount(true);
         
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
@@ -736,8 +736,8 @@ class OpdsController extends Controller {
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
-        $formats = $this->bookService->getFormats($page, $perPage);
-        $totalCount = $this->bookService->getFormatsCount();
+        $formats = $this->bookService->getFormats($page, $perPage, true);
+        $totalCount = $this->bookService->getFormatsCount(true);
         
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {
@@ -799,8 +799,8 @@ class OpdsController extends Controller {
         $page = max(1, (int)$this->request->getParam('page', 1));
         $perPage = min(100, max(10, (int)$this->request->getParam('per_page', 50)));
         
-        $languages = $this->bookService->getLanguages($page, $perPage);
-        $totalCount = $this->bookService->getLanguagesCount();
+        $languages = $this->bookService->getLanguages($page, $perPage, true);
+        $totalCount = $this->bookService->getLanguagesCount(true);
         
         $validationResponse = $this->validatePagination($page, $perPage, $totalCount);
         if ($validationResponse !== null) {

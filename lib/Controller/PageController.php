@@ -71,17 +71,18 @@ class PageController extends Controller {
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            // For AJAX requests, use searchBooks for queries, getBooks for empty/no query
-            // This ensures consistent behavior between initial page load and AJAX calls
+            // For AJAX requests, skip metadata updates (performance optimization)
+            // Metadata is updated on initial page load and file uploads
             if (empty($query)) {
-                $books = $this->bookService->getBooks($page, $perPage);
+                $books = $this->bookService->getBooks($page, $perPage, 'title', true);
             } else {
-                $books = $this->bookService->searchBooks($query, $page, $perPage);
+                $books = $this->bookService->searchBooks($query, $page, $perPage, true);
             }
             return new JSONResponse($books);
         }
-        
-        $books = $this->bookService->getBooks($page, $perPage);
+
+        // Initial page load: perform metadata update to ensure fresh data
+        $books = $this->bookService->getBooks($page, $perPage, 'title', false);
 
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
         $opdsUrl = $baseUrl . 'apps/koreader_companion/opds';
