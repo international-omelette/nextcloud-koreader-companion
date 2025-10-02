@@ -1,15 +1,12 @@
 <?php
 namespace OCA\KoreaderCompanion\AppInfo;
 
-use OCA\KoreaderCompanion\Listener\FileUploadListener;
 use OCA\KoreaderCompanion\Listener\FileDeleteListener;
 use OCA\KoreaderCompanion\Service\PdfMetadataExtractor;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
-use OCP\Files\Events\Node\NodeCreatedEvent;
-use OCP\Files\Events\Node\NodeWrittenEvent;
 use OCP\Files\Events\Node\NodeDeletedEvent;
 use Psr\Log\LoggerInterface;
 
@@ -35,9 +32,6 @@ class Application extends App implements IBootstrap {
             );
         });
         
-        // Register the file upload listener for external upload detection
-        $context->registerEventListener(NodeCreatedEvent::class, FileUploadListener::class);
-        $context->registerEventListener(NodeWrittenEvent::class, FileUploadListener::class);
         
         // Register the file delete listener for cleanup when files are deleted from filesystem
         $context->registerEventListener(NodeDeletedEvent::class, FileDeleteListener::class);

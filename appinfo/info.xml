@@ -15,9 +15,6 @@
   <dependencies>
     <nextcloud min-version="30" max-version="31" />
   </dependencies>
-  <settings>
-    <admin>OCA\KoreaderCompanion\Settings\AdminSettings</admin>
-  </settings>
   <navigations>
     <navigation>
       <name>KOReader</name>

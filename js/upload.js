@@ -4,25 +4,6 @@
 (function() {
     'use strict';
 
-    // Use global safeEncode function from koreader.js
-    // Fallback implementation if not available
-    function safeEncode(input, context = 'unknown') {
-        // Use global function if available
-        if (window.safeEncode) {
-            return window.safeEncode(input, context);
-        }
-
-        // Fallback implementation
-        try {
-            if (!input) {
-                return '';
-            }
-            return btoa(unescape(encodeURIComponent(input)));
-        } catch (error) {
-            return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        }
-    }
-
     let pendingFiles = [];
     let currentFileIndex = 0;
 
@@ -123,171 +104,6 @@
         }
     }
 
-    function initializeEditButtons() {
-        // Add click handlers to all edit book buttons
-        const editButtons = document.querySelectorAll('.edit-book-btn');
-        editButtons.forEach(button => {
-            button.addEventListener('click', handleEditBook);
-        });
-    }
-
-    function handleEditBook(e) {
-        e.preventDefault();
-        
-        const button = e.target;
-        const bookData = {
-            bookId: button.dataset.bookId,
-            title: button.dataset.title,
-            author: button.dataset.author,
-            format: button.dataset.format,
-            series: button.dataset.series || '',
-            issue: button.dataset.issue || '',
-            volume: button.dataset.volume || '',
-            language: button.dataset.language || 'en',
-            publisher: button.dataset.publisher || '',
-            publication_date: button.dataset.publicationDate || ''
-        };
-
-        showEditMetadataModal(bookData);
-    }
-
-    function showEditMetadataModal(bookData) {
-        // Populate form with existing book data
-        populateFormForEdit(bookData);
-        
-        // Change the save button text and behavior
-        const saveButton = document.getElementById('save-metadata');
-        if (saveButton) {
-            saveButton.textContent = 'Update Metadata';
-            // Remove existing click handlers and add update handler
-            saveButton.onclick = null;
-            saveButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                updateExistingMetadata(bookData.bookId);
-            });
-        }
-        
-        // Show the modal
-        metadataModal.style.display = 'flex';
-        
-        // SPECIFIC FIX: Ensure publication_date field is populated after modal is shown
-        // This handles any timing issues with DOM readiness
-        setTimeout(() => {
-            const dateField = document.getElementById('book-date');
-            if (dateField && bookData.publication_date) {
-                let year = bookData.publication_date;
-                // Extract year from date if needed  
-                const match = year.match(/(\d{4})/);
-                if (match) {
-                    year = match[1];
-                }
-                dateField.value = year;
-            }
-        }, 100);
-        
-        // Focus on title field
-        const titleField = document.getElementById('book-title');
-        if (titleField) titleField.focus();
-    }
-
-    function populateFormForEdit(bookData) {
-        // Store book ID for update
-        document.getElementById('book-id').value = bookData.bookId;
-        
-        // Populate all fields
-        Object.keys(bookData).forEach(key => {
-            if (key === 'path') return; // Skip path
-            
-            // Special handling for publication_date field - map to book-date input
-            if (key === 'publication_date') {
-                const dateElement = document.getElementById('book-date');
-                if (dateElement) {
-                    let value = bookData[key] || '';
-                    // Extract year from various date formats
-                    if (value) {
-                        const yearMatch = value.match(/(\d{4})/);
-                        if (yearMatch) {
-                            value = yearMatch[1];
-                        }
-                    }
-                    dateElement.value = value;
-                }
-            } else {
-                const element = document.getElementById(`book-${key}`) || document.getElementById(`comic-${key}`);
-                if (element) {
-                    element.value = bookData[key] || '';
-                }
-            }
-        });
-
-        // Show/hide comic fields based on format
-        toggleComicFields();
-    }
-
-    function updateExistingMetadata(bookId) {
-        const formData = new FormData(metadataForm);
-        
-        // Create update data as URL-encoded string
-        const updateParams = new URLSearchParams();
-        
-        // Add metadata
-        for (let [key, value] of formData.entries()) {
-            if (key !== 'file_path') { // Don't include file_path in update data
-                updateParams.append(key, value);
-            }
-        }
-        
-        const updateData = updateParams.toString();
-
-        // Update via our app's API endpoint
-        const xhr = new XMLHttpRequest();
-        
-        xhr.addEventListener('load', () => {
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        showNotification('Metadata updated successfully!', 'success');
-                        
-                        // Close modal and refresh page
-                        setTimeout(() => {
-                            hideMetadataModal();
-                            window.location.reload();
-                        }, 2000);
-                    } else {
-                        showNotification(`Failed to update metadata: ${response.error}`, 'error');
-                    }
-                } catch (e) {
-                    showNotification('Error parsing response', 'error');
-                }
-            } else {
-                showNotification(`Failed to update metadata (${xhr.status})`, 'error');
-            }
-        });
-
-        xhr.addEventListener('error', () => {
-            showNotification('Network error updating metadata', 'error');
-        });
-
-        // Use the book ID directly (no encoding needed)
-        const appUrl = OC.generateUrl('/apps/koreader_companion/books/{id}/metadata', {id: bookId});
-        
-        // Update via our custom endpoint
-        xhr.open('PUT', appUrl);
-        
-        // Set content type for URL-encoded data
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        
-        // Add CSRF token if available
-        if (window.OC && window.OC.requestToken) {
-            xhr.setRequestHeader('requesttoken', window.OC.requestToken);
-        }
-        
-        // Send the update data
-        xhr.send(updateData);
-    }
-
     function confirmDeleteBook() {
         const bookId = document.getElementById('book-id').value;
         if (!bookId) {
@@ -310,24 +126,20 @@
         
         xhr.addEventListener('load', () => {
             if (xhr.status === 200) {
+                showNotification('Book deleted successfully!', 'success');
+
+                // Close modal and refresh page
+                setTimeout(() => {
+                    hideMetadataModal();
+                    window.location.reload();
+                }, 1500);
+            } else {
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        showNotification('Book deleted successfully!', 'success');
-                        
-                        // Close modal and refresh page
-                        setTimeout(() => {
-                            hideMetadataModal();
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        showNotification(`Failed to delete book: ${response.error}`, 'error');
-                    }
+                    showNotification(`Failed to delete book: ${response.error}`, 'error');
                 } catch (e) {
-                    showNotification('Error parsing response', 'error');
+                    showNotification(`Failed to delete book (${xhr.status})`, 'error');
                 }
-            } else {
-                showNotification(`Failed to delete book (${xhr.status})`, 'error');
             }
         });
 
@@ -409,53 +221,88 @@
     function showMetadataModal(file) {
         // Show the modal first with loading state
         metadataModal.style.display = 'flex';
-        
+
         // Hide delete button for new entries (only show for editing existing books)
         const deleteButton = document.getElementById('delete-metadata');
         if (deleteButton) {
             deleteButton.style.display = 'none';
         }
-        
+
         // Show loading indicator
         const titleField = document.getElementById('book-title');
         if (titleField) {
             titleField.value = 'Extracting metadata...';
             titleField.disabled = true;
         }
-        
-        // Extract metadata from file content
-        if (window.MetadataExtractor) {
-            window.MetadataExtractor.extractMetadataFromFile(file).then(metadata => {
-                // Populate form with extracted metadata
-                populateForm(metadata, file);
-                
-                // Enable fields and focus on title field
-                if (titleField) {
-                    titleField.disabled = false;
-                    titleField.focus();
-                }
-            }).catch(error => {
-                // Fallback to filename parsing
-                const metadata = extractMetadataFromFilename(file);
-                populateForm(metadata, file);
-                
-                if (titleField) {
-                    titleField.disabled = false;
-                    titleField.focus();
-                }
-                
-                showNotification('Could not extract metadata from file, using filename parsing', 'warning');
-            });
-        } else {
-            // Fallback to filename parsing if MetadataExtractor not loaded
-            const metadata = extractMetadataFromFilename(file);
+
+        // Extract metadata using server-side endpoint
+        extractMetadataFromServer(file).then(metadata => {
+            // Populate form with extracted metadata
             populateForm(metadata, file);
-            
+
+            // Enable fields and focus on title field
             if (titleField) {
                 titleField.disabled = false;
                 titleField.focus();
             }
-        }
+        }).catch(error => {
+            // Fallback to filename parsing
+            const metadata = extractMetadataFromFilename(file);
+            populateForm(metadata, file);
+
+            if (titleField) {
+                titleField.disabled = false;
+                titleField.focus();
+            }
+
+            showNotification('Could not extract metadata from file, using filename parsing', 'warning');
+        });
+    }
+
+    function extractMetadataFromServer(file) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.metadata) {
+                            resolve(response.metadata);
+                        } else {
+                            reject(new Error('Failed to extract metadata: No metadata in response'));
+                        }
+                    } catch (e) {
+                        reject(new Error('Error parsing metadata response'));
+                    }
+                } else {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        reject(new Error('Failed to extract metadata: ' + (response.error || `Server error: ${xhr.status}`)));
+                    } catch (e) {
+                        reject(new Error(`Server error: ${xhr.status}`));
+                    }
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error extracting metadata'));
+            });
+
+            // Use the extract metadata endpoint
+            const appUrl = OC.generateUrl('/apps/koreader_companion/extract-metadata');
+            xhr.open('POST', appUrl);
+
+            // Add CSRF token if available
+            if (window.OC && window.OC.requestToken) {
+                xhr.setRequestHeader('requesttoken', window.OC.requestToken);
+            }
+
+            xhr.send(formData);
+        });
     }
 
     function hideMetadataModal() {
@@ -626,7 +473,7 @@
 
         // Upload via our app's API endpoint
         const xhr = new XMLHttpRequest();
-        
+
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const percentComplete = (e.loaded / e.total) * 100;
@@ -636,28 +483,22 @@
 
         xhr.addEventListener('load', () => {
             if (xhr.status === 200 || xhr.status === 201) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        updateUploadStatus(filename, 'completed');
-                        
-                        // Move to next file after a short delay
-                        setTimeout(() => {
-                            hideMetadataModal();
-                            currentFileIndex++;
-                            processNextFile();
-                        }, 1000);
-                    } else {
-                        updateUploadStatus(filename, 'error');
-                        showNotification(`Failed to upload ${filename}: ${response.error}`, 'error');
-                    }
-                } catch (e) {
-                    updateUploadStatus(filename, 'error');
-                    showNotification(`Error parsing response for ${filename}`, 'error');
-                }
+                updateUploadStatus(filename, 'completed');
+
+                // Move to next file after a short delay
+                setTimeout(() => {
+                    hideMetadataModal();
+                    currentFileIndex++;
+                    processNextFile();
+                }, 1000);
             } else {
                 updateUploadStatus(filename, 'error');
-                showNotification(`Failed to upload ${filename} (${xhr.status})`, 'error');
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    showNotification(`Failed to upload ${filename}: ${response.error}`, 'error');
+                } catch (e) {
+                    showNotification(`Failed to upload ${filename} (${xhr.status})`, 'error');
+                }
             }
         });
 
@@ -666,11 +507,9 @@
             showNotification(`Network error uploading ${filename}`, 'error');
         });
 
-        // Get the app's base URL
-        const appUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-        
-        // Upload via our custom endpoint
-        xhr.open('POST', `${appUrl}/upload`);
+        // Use the upload endpoint
+        const appUrl = OC.generateUrl('/apps/koreader_companion/upload');
+        xhr.open('POST', appUrl);
         
         // Add CSRF token if available
         if (window.OC && window.OC.requestToken) {

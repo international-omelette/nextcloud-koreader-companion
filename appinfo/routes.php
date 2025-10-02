@@ -6,12 +6,14 @@ return [
         ['name' => 'page#getKoreaderPassword', 'url' => '/settings/koreader-password', 'verb' => 'GET'],
         ['name' => 'page#setKoreaderPassword', 'url' => '/settings/koreader-password', 'verb' => 'PUT'],
         ['name' => 'page#uploadBook', 'url' => '/upload', 'verb' => 'POST'],
+        ['name' => 'page#extractMetadata', 'url' => '/extract-metadata', 'verb' => 'POST'],
         ['name' => 'page#updateMetadata', 'url' => '/books/{id}/metadata', 'verb' => 'PUT'],
         ['name' => 'page#deleteBook', 'url' => '/books/{id}', 'verb' => 'DELETE'],
+        ['name' => 'settings#getSettings', 'url' => '/settings', 'verb' => 'GET'],
         ['name' => 'settings#setFolder', 'url' => '/settings/folder', 'verb' => 'PUT'],
-        ['name' => 'settings#setRestrictUploads', 'url' => '/settings/restrict_uploads', 'verb' => 'PUT'],
-        ['name' => 'settings#setAutoCleanup', 'url' => '/settings/auto_cleanup', 'verb' => 'PUT'],
-        ['name' => 'settings#setAutoRename', 'url' => '/settings/auto_rename', 'verb' => 'PUT'],
+        ['name' => 'settings#setAutoRename', 'url' => '/settings/auto-rename', 'verb' => 'PUT'],
+        ['name' => 'settings#batchRename', 'url' => '/settings/batch-rename', 'verb' => 'POST'],
+        ['name' => 'settings#getBatchRenameProgress', 'url' => '/settings/batch-rename-progress', 'verb' => 'GET'],
         
         // OPDS endpoints
         ['name' => 'opds#index', 'url' => '/opds', 'verb' => 'GET'],

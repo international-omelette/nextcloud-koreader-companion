@@ -1,7 +1,6 @@
 <?php
 namespace OCA\KoreaderCompanion\Service;
 
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCP\Files\IRootFolder;
 use OCP\Files\Node;
 use OCP\IConfig;
@@ -15,22 +14,19 @@ class BookService {
     private $rootFolder;
     private $config;
     private $userSession;
-    private $fileTrackingService;
     private $db;
     private $pdfExtractor;
 
     public function __construct(
-        IRootFolder $rootFolder, 
-        IConfig $config, 
+        IRootFolder $rootFolder,
+        IConfig $config,
         IUserSession $userSession,
-        FileTrackingService $fileTrackingService,
         IDBConnection $db,
         PdfMetadataExtractor $pdfExtractor
     ) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->userSession = $userSession;
-        $this->fileTrackingService = $fileTrackingService;
         $this->db = $db;
         $this->pdfExtractor = $pdfExtractor;
     }
@@ -39,10 +35,10 @@ class BookService {
     /**
      * Get paginated books from database with optional sorting
      */
-    public function getBooks($page = null, $perPage = null, $sort = 'title') {
+    public function getBooks($page = null, $perPage = null, $sort = 'title', $skipMetadataUpdate = false) {
         // If pagination parameters are provided, use database-based pagination
         if ($page !== null && $perPage !== null) {
-            return $this->getPaginatedBooks($page, $perPage, $sort);
+            return $this->getPaginatedBooks($page, $perPage, $sort, $skipMetadataUpdate);
         }
         
         // Otherwise, maintain backward compatibility with file-system scanning
@@ -51,7 +47,7 @@ class BookService {
             return [];
         }
 
-        $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+        $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
         $userFolder = $this->rootFolder->getUserFolder($user->getUID());
         
         try {
@@ -79,7 +75,7 @@ class BookService {
     /**
      * Get paginated books from database and file system
      */
-    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title') {
+    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title', $skipMetadataUpdate = false) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -87,9 +83,11 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // First, ensure metadata is up to date by scanning for new files
-        $this->ensureMetadataUpToDate($userId);
+
+        // First, ensure metadata is up to date by scanning for new files (unless skipped)
+        if (!$skipMetadataUpdate) {
+            $this->ensureMetadataUpToDate($userId);
+        }
         
         // Now query database for paginated results
         try {
@@ -99,7 +97,7 @@ class BookService {
                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
                ->setFirstResult($offset)
                ->setMaxResults($perPage);
-            
+
             // Apply sorting
             switch ($sort) {
                 case 'recent':
@@ -147,16 +145,17 @@ class BookService {
         }
 
         $userId = $user->getUID();
-        
+
         // Ensure metadata is up to date first
         $this->ensureMetadataUpToDate($userId);
-        
+
         try {
             $qb = $this->db->getQueryBuilder();
             $result = $qb->select($qb->func()->count('*', 'total_count'))
                 ->from('koreader_metadata')
-                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                ->executeQuery();
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+
+            $result = $qb->executeQuery();
                 
             $count = (int)$result->fetchOne();
             $result->closeCursor();
@@ -169,12 +168,13 @@ class BookService {
         }
     }
 
+
     /**
      * Ensure metadata database is up to date by scanning filesystem
      */
-    private function ensureMetadataUpToDate($userId) {
+    public function ensureMetadataUpToDate($userId) {
         try {
-            $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+            $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
             $userFolder = $this->rootFolder->getUserFolder($userId);
             
             try {
@@ -208,9 +208,7 @@ class BookService {
             } else {
                 $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
                 if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    if ($this->shouldIncludeFile($node)) {
-                        $this->ensureFileInDatabase($node, $userId);
-                    }
+                    $this->ensureFileInDatabase($node, $userId);
                 }
             }
         }
@@ -371,17 +369,14 @@ class BookService {
         }
     }
 
-    private function scanFolder(Node $folder, &$books) {
+    protected function scanFolder(Node $folder, &$books) {
         foreach ($folder->getDirectoryListing() as $node) {
             if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
                 $this->scanFolder($node, $books);
             } else {
                 $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
                 if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    // Check if this file should be included based on upload restrictions
-                    if ($this->shouldIncludeFile($node)) {
-                        $books[] = $this->extractMetadata($node);
-                    }
+                    $books[] = $this->extractMetadata($node);
                 }
             }
         }
@@ -389,7 +384,7 @@ class BookService {
 
     private function extractMetadata(Node $file) {
         $extension = strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION));
-        
+
         $metadata = [
             'id' => $file->getId(),
             'name' => $file->getName(),
@@ -424,8 +419,7 @@ class BookService {
                 }
             }
         } else {
-            // Fallback to server-side metadata extraction only if no stored metadata exists
-            // This handles files that were uploaded before the client-side extraction was implemented
+            // Extract metadata from file using server-side parsers
             if ($extension === 'epub') {
                 $this->extractEpubMetadata($file, $metadata);
             } elseif ($extension === 'pdf') {
@@ -447,6 +441,53 @@ class BookService {
 
         // Add KOReader sync progress information
         $this->addSyncProgressToMetadata($file, $metadata);
+
+        return $metadata;
+    }
+
+    /**
+     * Extract metadata for display and editing (used in upload workflow)
+     * Returns raw extracted metadata without progress information
+     */
+    public function extractMetadataForUpload(Node $file): array {
+        $extension = strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION));
+
+        $metadata = [
+            'title' => pathinfo($file->getName(), PATHINFO_FILENAME),
+            'author' => '',
+            'description' => '',
+            'language' => '',
+            'publisher' => '',
+            'publication_date' => '',
+            'subject' => '',
+            'series' => '',
+            'issue' => '',
+            'volume' => '',
+            'tags' => '',
+            'format' => $extension
+        ];
+
+        try {
+            // Extract metadata from file based on format
+            if ($extension === 'epub') {
+                $this->extractEpubMetadata($file, $metadata);
+            } elseif ($extension === 'pdf') {
+                $this->extractPdfMetadata($file, $metadata);
+            } elseif ($extension === 'cbr') {
+                if (class_exists('Kiwilan\Archive\Archive')) {
+                    $this->extractCbrMetadata($file, $metadata);
+                } else {
+                    // Fallback: basic filename metadata for CBR
+                    $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
+                    $metadata['title'] = $filename;
+                }
+            } elseif ($extension === 'mobi') {
+                $this->extractMobiMetadata($file, $metadata);
+            }
+        } catch (\Exception $e) {
+            // If extraction fails, keep the filename-based defaults
+            error_log('eBooks app: Metadata extraction failed for ' . $file->getPath() . ': ' . $e->getMessage());
+        }
 
         return $metadata;
     }
@@ -894,17 +935,19 @@ class BookService {
         
         // Ensure metadata is up to date
         $this->ensureMetadataUpToDate($userId);
-        
+
         if (empty($query)) {
             return $this->getPaginatedBooks($page, $perPage);
         }
-        
+
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select('*')
                ->from('koreader_metadata')
-               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-               ->andWhere($qb->expr()->orX(
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+
+            // Add search conditions
+            $qb->andWhere($qb->expr()->orX(
                    $qb->expr()->iLike('title', $qb->createNamedParameter('%' . $query . '%')),
                    $qb->expr()->iLike('author', $qb->createNamedParameter('%' . $query . '%')),
                    $qb->expr()->iLike('description', $qb->createNamedParameter('%' . $query . '%')),
@@ -980,164 +1023,7 @@ class BookService {
         }
     }
 
-    private function shouldIncludeFile(Node $file) {
-        // Check if upload restrictions are enabled globally
-        $restrictUploads = $this->config->getAppValue('koreader_companion', 'restrict_uploads', 'no');
-        if ($restrictUploads !== 'yes') {
-            return true; // No restrictions, include all files
-        }
 
-        // Get user context - for OPDS/API calls, extract from file path
-        $user = $this->userSession->getUser();
-        $userId = null;
-        
-        if ($user) {
-            $userId = $user->getUID();
-        } else {
-            // Extract user ID from file path for API contexts
-            $path = $file->getPath();
-            if (preg_match('/^\/([^\/]+)\/files\//', $path, $matches)) {
-                $userId = $matches[1];
-            }
-        }
-        
-        if (!$userId) {
-            // If we can't determine user, allow file to prevent breaking functionality
-            return true;
-        }
-
-        // Check if this file was uploaded through the app using database tracking
-        $isAppUploaded = $this->fileTrackingService->isAppUploadedFile($file, $userId);
-        
-        // If file is not tracked, check if it might be a legacy file or use fallback
-        if (!$isAppUploaded) {
-            $uploadMethod = $this->fileTrackingService->getFileUploadMethod($file, $userId);
-            if ($uploadMethod === null) {
-                // File not tracked - check file creation context and legacy preferences
-                $isAppUploaded = $this->checkFileOriginWithFallback($file, $userId);
-            }
-        }
-
-        // If file was not uploaded through app and auto-cleanup is enabled, quarantine it
-        if (!$isAppUploaded) {
-            $autoCleanup = $this->config->getAppValue('koreader_companion', 'auto_cleanup', 'no');
-            if ($autoCleanup === 'yes') {
-                $this->quarantineFileForUser($file, $userId);
-                return false; // Don't include quarantined files
-            }
-        }
-
-        return $isAppUploaded; // Only include app-uploaded files when restrictions are enabled
-    }
-
-    /**
-     * Quarantine file for a specific user (used when user context is available)
-     */
-    private function quarantineFile(Node $file) {
-        $user = $this->userSession->getUser();
-        if ($user) {
-            $this->quarantineFileForUser($file, $user->getUID());
-        }
-    }
-
-    /**
-     * Quarantine file for a specific user ID (works in any context)
-     */
-    private function quarantineFileForUser(Node $file, string $userId) {
-        try {
-            $userFolder = $this->rootFolder->getUserFolder($userId);
-            
-            // Create quarantine folder if it doesn't exist
-            try {
-                $quarantineFolder = $userFolder->get('Books_Quarantine');
-            } catch (\OCP\Files\NotFoundException $e) {
-                $quarantineFolder = $userFolder->newFolder('Books_Quarantine');
-            }
-
-            // Move file to quarantine
-            $newName = $file->getName();
-            $counter = 1;
-            while ($quarantineFolder->nodeExists($newName)) {
-                $pathInfo = pathinfo($file->getName());
-                $newName = $pathInfo['filename'] . "_$counter." . $pathInfo['extension'];
-                $counter++;
-            }
-
-            $file->move($quarantineFolder->getPath() . '/' . $newName);
-            
-            // Log the quarantine action
-            error_log("eBooks app: Quarantined file {$file->getName()} to Books_Quarantine/$newName for user $userId (not uploaded through app)");
-            
-        } catch (\Exception $e) {
-            error_log("eBooks app: Failed to quarantine file {$file->getName()} for user $userId: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Check file origin when tracking data is unavailable
-     * This provides a fallback mechanism for determining if files should be included
-     */
-    private function checkFileOriginWithFallback(Node $file, string $userId) {
-        try {
-            // First, check legacy JSON tracking in user preferences
-            $legacyTracking = $this->checkLegacyTracking($file, $userId);
-            if ($legacyTracking !== null) {
-                // Migrate to database if found in legacy tracking
-                if ($legacyTracking) {
-                    $this->fileTrackingService->markFileAsAppUploaded($file, $userId);
-                }
-                return $legacyTracking;
-            }
-
-            // Check if file was created very recently (within last 5 minutes)
-            // Recent files are likely from current session and should be included
-            $createTime = $file->getMTime();
-            $currentTime = time();
-            if (($currentTime - $createTime) < 300) { // 5 minutes
-                // Mark recent files as external uploads for future reference
-                $this->fileTrackingService->markFileAsExternalUpload($file, $userId);
-                return true;
-            }
-
-            // For older files, be conservative and exclude them when restrictions are enabled
-            // This prevents processing of files that were uploaded before restrictions were activated
-            $this->fileTrackingService->markFileAsExternalUpload($file, $userId);
-            return false;
-            
-        } catch (\Exception $e) {
-            // If we can't determine file age, default to including it
-            return true;
-        }
-    }
-
-    /**
-     * Check legacy JSON tracking in user preferences
-     */
-    private function checkLegacyTracking(Node $file, string $userId): ?bool {
-        try {
-            $appUploadedFiles = $this->config->getUserValue(
-                $userId,
-                'koreader_companion',
-                'app_uploaded_files',
-                ''
-            );
-
-            if (empty($appUploadedFiles)) {
-                return null; // No legacy data
-            }
-
-            $uploadedList = json_decode($appUploadedFiles, true);
-            if (!is_array($uploadedList)) {
-                return null; // Invalid legacy data
-            }
-
-            $fileId = $file->getId();
-            return in_array($fileId, $uploadedList);
-            
-        } catch (\Exception $e) {
-            return null; // Error reading legacy data
-        }
-    }
 
     public function getBookById($id) {
         $allBooks = $this->getBooks();
@@ -1894,7 +1780,7 @@ class BookService {
                ->andWhere($qb->expr()->eq('author', $qb->createNamedParameter($author)))
                ->setFirstResult($offset)
                ->setMaxResults($perPage);
-            
+
             // Apply sorting
             switch ($sort) {
                 case 'recent':

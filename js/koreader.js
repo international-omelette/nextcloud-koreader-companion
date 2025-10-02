@@ -1,21 +1,3 @@
-// Unicode-safe base64 encoding for KOReader compatibility
-function safeEncode(input, context = 'unknown') {
-    try {
-        if (!input) {
-            return '';
-        }
-
-        return btoa(unescape(encodeURIComponent(input)));
-    } catch (error) {
-        // Return fallback - use timestamp as unique identifier
-        return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-}
-
-// Make safeEncode globally available
-window.safeEncode = safeEncode;
-
-
 $(document).ready(function() {
     initSidePaneNavigation();
     initUploadModal();
@@ -25,6 +7,7 @@ $(document).ready(function() {
     initInfiniteScroll();
     initResponsiveHandling();
     initHamburgerMenu();
+    initSettings();
 });
 
 // Handle responsive layout transitions smoothly
@@ -100,7 +83,7 @@ function initUploadModal() {
     // ESC key closes modal
     $(document).on('keydown', function(e) {
         if (e.key === 'Escape') {
-            $('.modal:visible').hide();
+            $('.koreader-modal:visible').hide();
         }
     });
     
@@ -279,20 +262,11 @@ function setKoreaderPassword() {
             password: password
         },
         success: function(response) {
-            if (response.success) {
-                OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password set successfully'));
-                
-                // Store password for display
-                window.currentKoreaderPassword = password;
-                
-                // Clear form
-                document.getElementById('koreader-password-create').value = '';
-                
-                // Show password section
-                showKoreaderPassword(password);
-            } else {
-                OC.Notification.showTemporary(response.error || t('koreader_companion', 'Failed to set sync password'));
-            }
+            OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password set successfully'));
+
+            window.currentKoreaderPassword = password;
+            document.getElementById('koreader-password-create').value = '';
+            showKoreaderPassword(password);
         },
         error: function(xhr) {
             const response = xhr.responseJSON;
@@ -332,18 +306,11 @@ function resetKoreaderPassword() {
             password: newPassword
         },
         success: function(response) {
-            if (response.success) {
-                OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password updated successfully'));
-                
-                // Update stored password
-                window.currentKoreaderPassword = newPassword;
-                document.getElementById('koreader-password-display').value = newPassword;
-                
-                // Hide form
-                hideKoreaderPasswordResetForm();
-            } else {
-                OC.Notification.showTemporary(response.error || t('koreader_companion', 'Failed to update password'));
-            }
+            OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password updated successfully'));
+
+            window.currentKoreaderPassword = newPassword;
+            document.getElementById('koreader-password-display').value = newPassword;
+            hideKoreaderPasswordResetForm();
         },
         error: function(xhr) {
             const response = xhr.responseJSON;
@@ -710,10 +677,8 @@ function createBookRow(book) {
         
         // Format file size
         const fileSize = formatFileSize(book.size || 0);
-        
-        // Use the book's file ID directly (no encoding needed)
         const bookId = book.id;
-        
+
         // Build comic info if applicable
         let comicInfo = '';
         if (book.format === 'cbr' && (book.series || book.issue)) {
@@ -939,27 +904,23 @@ function saveEditedMetadata(bookId) {
             saveButton.disabled = false;
             saveButton.textContent = 'Save Changes';
         }
-        
+
         if (xhr.status === 200) {
-            try {
-                const response = JSON.parse(xhr.responseText);
-                if (response.success) {
-                    OC.Notification.showTemporary(t('koreader_companion', 'Book metadata updated successfully'));
-                    hideEditMetadataModal();
-                    // Refresh the books list
-                    if (typeof loadBooks === 'function') {
-                        loadBooks();
-                    } else {
-                        location.reload();
-                    }
-                } else {
-                    OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
-                }
-            } catch (e) {
-                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata'));
+            OC.Notification.showTemporary(t('koreader_companion', 'Book metadata updated successfully'));
+            hideEditMetadataModal();
+            // Refresh the books list
+            if (typeof loadBooks === 'function') {
+                loadBooks();
+            } else {
+                location.reload();
             }
         } else {
-            OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata ({status})', {status: xhr.status}));
+            try {
+                const response = JSON.parse(xhr.responseText);
+                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
+            } catch (e) {
+                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata ({status})', {status: xhr.status}));
+            }
         }
     };
     
@@ -1134,4 +1095,267 @@ function handleOutsideClick(e) {
         navigationOpen = false;
         body.classList.remove('navigation-open');
     }
+}
+
+// Settings functionality
+function initSettings() {
+    // Load settings when settings section becomes active
+    $(document).on('click', '[data-section="settings"]', function() {
+        loadSettings();
+    });
+
+    // Save folder button (individual save)
+    $('#save-folder-btn').on('click', function() {
+        saveFolderSetting();
+    });
+
+    // Cancel folder change button
+    $('#cancel-folder-btn').on('click', function() {
+        cancelFolderChange();
+    });
+
+    // Browse folder button
+    $('#browse-folder-btn').on('click', function() {
+        openFolderPicker();
+    });
+
+    // Monitor folder input changes
+    $('#ebooks-folder').on('change input', function() {
+        checkFolderChange();
+    });
+
+    // Auto-rename confirmation handling
+    $('#confirm-auto-rename-btn').on('click', function() {
+        confirmAutoRename();
+    });
+
+    $('#cancel-auto-rename-btn').on('click', function() {
+        cancelAutoRename();
+    });
+
+    // Monitor auto-rename checkbox changes
+    $('#auto-rename').on('change', function() {
+        checkAutoRenameChange();
+    });
+}
+
+// Store original folder value for change detection
+let originalFolderValue = '';
+let originalAutoRenameValue = false;
+
+function loadSettings() {
+    $.get(OC.generateUrl('/apps/koreader_companion/settings'))
+        .done(function(data) {
+            const folder = data.folder || 'eBooks';
+            $('#ebooks-folder').val(folder);
+            originalFolderValue = folder; // Store original value
+
+            const autoRename = data.auto_rename === 'yes';
+            $('#auto-rename').prop('checked', autoRename);
+            originalAutoRenameValue = autoRename; // Store original value
+        })
+        .fail(function() {
+            // Settings failed to load - silent failure
+        });
+}
+
+
+function saveFolderSetting() {
+    const newFolder = $('#ebooks-folder').val() || 'eBooks';
+    saveFolderDirect(newFolder);
+}
+
+function saveFolderDirect(folder) {
+    const data = { folder: folder };
+
+    $.ajax({ url: OC.generateUrl('/apps/koreader_companion/settings/folder'), method: 'PUT', data: data })
+        .done(function(response) {
+            originalFolderValue = folder; // Update original value
+            $('#folder-change-confirmation').hide(); // Hide confirmation after save
+
+            // If folder changed, suggest reloading the page
+            if (response.folder_changed) {
+                setTimeout(() => {
+                    if (confirm('Library has been cleared. Would you like to reload the page to see the updated library?')) {
+                        location.reload();
+                    }
+                }, 1000);
+            }
+        })
+        .fail(function() {
+            $('#ebooks-folder').val(originalFolderValue); // Revert on failure
+            // Failed to save folder setting - silent failure
+        });
+}
+
+
+function checkFolderChange() {
+    const currentValue = $('#ebooks-folder').val() || 'eBooks';
+    const isFolderChanging = (originalFolderValue !== currentValue);
+
+    if (isFolderChanging) {
+        $('#folder-change-confirmation').show();
+    } else {
+        $('#folder-change-confirmation').hide();
+    }
+}
+
+function cancelFolderChange() {
+    $('#ebooks-folder').val(originalFolderValue);
+    $('#folder-change-confirmation').hide();
+}
+
+function openFolderPicker() {
+    OC.dialogs.filepicker(
+        t('koreader_companion', 'Select eBooks Folder'),
+        function(path) {
+            // Remove leading slash if present for consistency
+            const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+            $('#ebooks-folder').val(cleanPath);
+            checkFolderChange(); // Check if this triggers the confirmation
+        },
+        false,                          // multiselect
+        'httpd/unix-directory',        // directories only
+        true,                          // modal
+        OC.dialogs.FILEPICKER_TYPE_CHOOSE
+    );
+}
+
+// Auto-rename handling functions
+function checkAutoRenameChange() {
+    const currentValue = $('#auto-rename').is(':checked');
+
+    // Only show confirmation when changing from off to on
+    if (!originalAutoRenameValue && currentValue) {
+        $('#auto-rename-confirmation').show();
+    } else {
+        $('#auto-rename-confirmation').hide();
+        // If turning off, save immediately without confirmation
+        if (originalAutoRenameValue && !currentValue) {
+            saveAutoRenameSetting(false);
+        }
+    }
+}
+
+function confirmAutoRename() {
+    // Show progress bar and disable buttons and checkbox
+    $('#confirm-auto-rename-btn').prop('disabled', true).text('Starting...');
+    $('#cancel-auto-rename-btn').prop('disabled', true);
+    $('#auto-rename').prop('disabled', true);
+    $('#batch-progress').show();
+
+    // Start the batch rename operation
+    $.ajax({
+        url: OC.generateUrl('/apps/koreader_companion/settings/batch-rename'),
+        method: 'POST',
+        data: { auto_rename: 'yes' }
+    })
+    .done(function(response) {
+        originalAutoRenameValue = true;
+        // Don't hide confirmation yet - let polling handle completion
+    })
+    .fail(function(xhr) {
+        const error = xhr.responseJSON?.error || 'Failed to start batch rename';
+        OC.Notification.showTemporary(error);
+
+        // Reset UI state
+        $('#batch-progress').hide();
+        $('#auto-rename').prop('checked', originalAutoRenameValue);
+        $('#auto-rename-confirmation').hide();
+        $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+        $('#cancel-auto-rename-btn').prop('disabled', false);
+    });
+
+    // Start polling for progress
+    startProgressPolling();
+}
+
+let progressPollingInterval = null;
+
+function startProgressPolling() {
+    // Clear any existing polling
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+    }
+
+    // Poll every 2 seconds for progress updates
+    progressPollingInterval = setInterval(function() {
+        $.ajax({
+            url: OC.generateUrl('/apps/koreader_companion/settings/batch-rename-progress'),
+            method: 'GET'
+        })
+        .done(function(progress) {
+            updateProgressDisplay(progress);
+
+            // Check if completed
+            if (progress.percent >= 100 && progress.status === 'Completed') {
+                clearInterval(progressPollingInterval);
+                progressPollingInterval = null;
+                handleBatchRenameComplete(progress);
+            }
+        })
+        .fail(function() {
+            // If polling fails, stop polling and reset UI
+            clearInterval(progressPollingInterval);
+            progressPollingInterval = null;
+            $('#batch-progress').hide();
+            $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+            $('#cancel-auto-rename-btn').prop('disabled', false);
+        });
+    }, 2000);
+}
+
+function updateProgressDisplay(progress) {
+    $('.progress-fill').css('width', progress.percent + '%');
+    $('.progress-text').text(progress.status);
+}
+
+function handleBatchRenameComplete(progress) {
+    // Hide progress and reset UI
+    $('#batch-progress').hide();
+    $('#auto-rename-confirmation').hide();
+    $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+    $('#cancel-auto-rename-btn').prop('disabled', false);
+
+    // Show success message
+    OC.Notification.showTemporary(
+        `Successfully renamed ${progress.renamed_count} of ${progress.total_books} books to standardized format.`
+    );
+
+    // Auto-reload page to show updated filenames
+    setTimeout(() => {
+        location.reload();
+    }, 1500);
+}
+
+function cancelAutoRename() {
+    // Stop any ongoing progress polling
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+        progressPollingInterval = null;
+    }
+
+    // Revert checkbox to original state
+    $('#auto-rename').prop('checked', originalAutoRenameValue);
+    $('#auto-rename-confirmation').hide();
+    $('#batch-progress').hide();
+
+    // Reset button states
+    $('#confirm-auto-rename-btn').prop('disabled', false).text('Enable and rename all books');
+    $('#cancel-auto-rename-btn').prop('disabled', false);
+}
+
+function saveAutoRenameSetting(enabled) {
+    $.ajax({
+        url: OC.generateUrl('/apps/koreader_companion/settings/auto-rename'),
+        method: 'PUT',
+        data: { auto_rename: enabled ? 'yes' : 'no' }
+    })
+    .done(function() {
+        originalAutoRenameValue = enabled;
+    })
+    .fail(function() {
+        // Revert on failure
+        $('#auto-rename').prop('checked', originalAutoRenameValue);
+    });
 }
