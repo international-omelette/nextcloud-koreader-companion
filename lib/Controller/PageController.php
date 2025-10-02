@@ -123,8 +123,8 @@ class PageController extends Controller {
         // KOReader protocol requires MD5, so we store MD5 hash (not plain password)
         $md5Hash = md5($password);
         $this->config->setUserValue($user->getUID(), 'koreader_companion', 'koreader_sync_password', $md5Hash);
-        
-        return new DataResponse(['success' => true]);
+
+        return new DataResponse([]);
     }
 
     /**
@@ -308,7 +308,6 @@ class PageController extends Controller {
             $this->storeBookMetadata($finalFile, $finalMetadata);
 
             return new JSONResponse([
-                'success' => true,
                 'filename' => $finalFilename,
                 'path' => $finalPath,
                 'extracted_metadata' => $extractedMetadata
@@ -350,7 +349,6 @@ class PageController extends Controller {
             $tempFile->delete();
 
             return new JSONResponse([
-                'success' => true,
                 'metadata' => $metadata
             ]);
 
@@ -445,7 +443,7 @@ class PageController extends Controller {
                 $targetFile->move($parentFolder->getPath() . '/' . $newName);
             }
 
-            return new JSONResponse(['success' => true]);
+            return new JSONResponse([]);
 
         } catch (\Exception $e) {
             return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -488,7 +486,7 @@ class PageController extends Controller {
             // Delete the file
             $targetFile->delete();
 
-            return new JSONResponse(['success' => true]);
+            return new JSONResponse([]);
 
         } catch (\Exception $e) {
             return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);

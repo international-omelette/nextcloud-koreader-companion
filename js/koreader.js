@@ -1,21 +1,3 @@
-// Unicode-safe base64 encoding for KOReader compatibility
-function safeEncode(input, context = 'unknown') {
-    try {
-        if (!input) {
-            return '';
-        }
-
-        return btoa(unescape(encodeURIComponent(input)));
-    } catch (error) {
-        // Return fallback - use timestamp as unique identifier
-        return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-}
-
-// Make safeEncode globally available
-window.safeEncode = safeEncode;
-
-
 $(document).ready(function() {
     initSidePaneNavigation();
     initUploadModal();
@@ -280,20 +262,11 @@ function setKoreaderPassword() {
             password: password
         },
         success: function(response) {
-            if (response.success) {
-                OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password set successfully'));
-                
-                // Store password for display
-                window.currentKoreaderPassword = password;
-                
-                // Clear form
-                document.getElementById('koreader-password-create').value = '';
-                
-                // Show password section
-                showKoreaderPassword(password);
-            } else {
-                OC.Notification.showTemporary(response.error || t('koreader_companion', 'Failed to set sync password'));
-            }
+            OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password set successfully'));
+
+            window.currentKoreaderPassword = password;
+            document.getElementById('koreader-password-create').value = '';
+            showKoreaderPassword(password);
         },
         error: function(xhr) {
             const response = xhr.responseJSON;
@@ -333,18 +306,11 @@ function resetKoreaderPassword() {
             password: newPassword
         },
         success: function(response) {
-            if (response.success) {
-                OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password updated successfully'));
-                
-                // Update stored password
-                window.currentKoreaderPassword = newPassword;
-                document.getElementById('koreader-password-display').value = newPassword;
-                
-                // Hide form
-                hideKoreaderPasswordResetForm();
-            } else {
-                OC.Notification.showTemporary(response.error || t('koreader_companion', 'Failed to update password'));
-            }
+            OC.Notification.showTemporary(t('koreader_companion', 'KOReader sync password updated successfully'));
+
+            window.currentKoreaderPassword = newPassword;
+            document.getElementById('koreader-password-display').value = newPassword;
+            hideKoreaderPasswordResetForm();
         },
         error: function(xhr) {
             const response = xhr.responseJSON;
@@ -711,10 +677,8 @@ function createBookRow(book) {
         
         // Format file size
         const fileSize = formatFileSize(book.size || 0);
-        
-        // Create book ID (base64 encoded path) - Unicode safe encoding
-        const bookId = safeEncode(book.path, 'book.path');
-        
+        const bookId = book.id;
+
         // Build comic info if applicable
         let comicInfo = '';
         if (book.format === 'cbr' && (book.series || book.issue)) {
@@ -940,27 +904,23 @@ function saveEditedMetadata(bookId) {
             saveButton.disabled = false;
             saveButton.textContent = 'Save Changes';
         }
-        
+
         if (xhr.status === 200) {
-            try {
-                const response = JSON.parse(xhr.responseText);
-                if (response.success) {
-                    OC.Notification.showTemporary(t('koreader_companion', 'Book metadata updated successfully'));
-                    hideEditMetadataModal();
-                    // Refresh the books list
-                    if (typeof loadBooks === 'function') {
-                        loadBooks();
-                    } else {
-                        location.reload();
-                    }
-                } else {
-                    OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
-                }
-            } catch (e) {
-                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata'));
+            OC.Notification.showTemporary(t('koreader_companion', 'Book metadata updated successfully'));
+            hideEditMetadataModal();
+            // Refresh the books list
+            if (typeof loadBooks === 'function') {
+                loadBooks();
+            } else {
+                location.reload();
             }
         } else {
-            OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata ({status})', {status: xhr.status}));
+            try {
+                const response = JSON.parse(xhr.responseText);
+                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata: {error}', {error: response.error}));
+            } catch (e) {
+                OC.Notification.showTemporary(t('koreader_companion', 'Failed to update metadata ({status})', {status: xhr.status}));
+            }
         }
     };
     
