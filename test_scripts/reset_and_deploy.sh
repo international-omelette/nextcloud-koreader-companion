@@ -4,7 +4,7 @@ set -euo pipefail
 # Removes previous PoC app copies and retries copying + enabling with detailed logs and checks.
 
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-APP_SRC="$DIR/../koreader-companion"
+APP_SRC="$DIR/.."
 COMPOSE_PROJECT_DIR="$DIR/.."
 
 log(){ echo "$*"; }

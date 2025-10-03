@@ -15,6 +15,7 @@ use OCP\IConfig;
 use OCP\IUserSession;
 use OCP\IURLGenerator;
 use OCP\IDBConnection;
+use Psr\Log\LoggerInterface;
 
 class PageController extends Controller {
 
@@ -26,6 +27,7 @@ class PageController extends Controller {
     private $rootFolder;
     private $hashGenerator;
     private $filenameService;
+    private LoggerInterface $logger;
 
     public function __construct(
         IRequest $request,
@@ -37,7 +39,8 @@ class PageController extends Controller {
         IURLGenerator $urlGenerator,
         IDBConnection $db,
         IRootFolder $rootFolder,
-        DocumentHashGenerator $hashGenerator
+        DocumentHashGenerator $hashGenerator,
+        LoggerInterface $logger
     ) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
@@ -53,6 +56,7 @@ class PageController extends Controller {
         $this->db = $db;
         $this->rootFolder = $rootFolder;
         $this->hashGenerator = $hashGenerator;
+        $this->logger = $logger;
     }
 
     /**
@@ -570,7 +574,10 @@ class PageController extends Controller {
                 $insertQb->executeStatement();
             }
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to store metadata for file ' . $filePath . ': ' . $e->getMessage());
+            $this->logger->error('Failed to store metadata for file', [
+                'file_path' => $filePath,
+                'exception' => $e
+            ]);
         }
     }
 
@@ -650,14 +657,18 @@ class PageController extends Controller {
             $result->closeCursor();
 
             if (!$metadataId) {
-                error_log('eBooks app: No metadata found for file after rename: ' . $file->getName());
+                $this->logger->warning('No metadata found for file after rename', [
+                    'file_name' => $file->getName()
+                ]);
                 return;
             }
 
             // Generate new filename hash
             $newFilenameHash = $this->hashGenerator->generateFilenameHashFromNode($file);
             if (!$newFilenameHash) {
-                error_log('eBooks app: Failed to generate new filename hash after rename: ' . $file->getName());
+                $this->logger->error('Failed to generate new filename hash after rename', [
+                    'file_name' => $file->getName()
+                ]);
                 return;
             }
 
@@ -671,14 +682,20 @@ class PageController extends Controller {
                 ->executeStatement();
 
             if ($updatedRows > 0) {
-                error_log('eBooks app: Updated filename hash mapping after rename - File: ' . $file->getName() . ', New hash: ' . $newFilenameHash);
+                $this->logger->info('Updated filename hash mapping after rename', [
+                    'file_name' => $file->getName(),
+                    'new_hash' => $newFilenameHash
+                ]);
             } else {
-                // No existing filename mapping found - this is normal if KOReader hasn't synced this file yet
-                error_log('eBooks app: No filename hash mapping to update after rename - File: ' . $file->getName());
+                $this->logger->info('No filename hash mapping to update after rename', [
+                    'file_name' => $file->getName()
+                ]);
             }
 
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to update hash mapping after rename: ' . $e->getMessage());
+            $this->logger->error('Failed to update hash mapping after rename', [
+                'exception' => $e
+            ]);
         }
     }
 }

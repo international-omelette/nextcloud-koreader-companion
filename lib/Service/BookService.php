@@ -8,6 +8,7 @@ use OCP\IUserSession;
 use OCP\IDBConnection;
 use OCP\AppFramework\Http\StreamResponse;
 use OCP\AppFramework\Http\DataResponse;
+use Psr\Log\LoggerInterface;
 
 class BookService {
 
@@ -16,19 +17,22 @@ class BookService {
     private $userSession;
     private $db;
     private $pdfExtractor;
+    private LoggerInterface $logger;
 
     public function __construct(
         IRootFolder $rootFolder,
         IConfig $config,
         IUserSession $userSession,
         IDBConnection $db,
-        PdfMetadataExtractor $pdfExtractor
+        PdfMetadataExtractor $pdfExtractor,
+        LoggerInterface $logger
     ) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->userSession = $userSession;
         $this->db = $db;
         $this->pdfExtractor = $pdfExtractor;
+        $this->logger = $logger;
     }
 
 
@@ -127,9 +131,11 @@ class BookService {
             
             $result->closeCursor();
             return $books;
-            
+
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get paginated books: ' . $e->getMessage());
+            $this->logger->error('Failed to get paginated books', [
+                'exception' => $e
+            ]);
             // Fallback to filesystem scanning
             return $this->getBooks();
         }
@@ -161,10 +167,12 @@ class BookService {
                 
             $count = (int)$result->fetchOne();
             $result->closeCursor();
-            
+
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get total book count: ' . $e->getMessage());
+            $this->logger->error('Failed to get total book count', [
+                'exception' => $e
+            ]);
             // Fallback to counting filesystem results
             return count($this->getBooks());
         }
@@ -196,7 +204,9 @@ class BookService {
 
             $this->cleanupOrphanedMetadata($userId);
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to update metadata: ' . $e->getMessage());
+            $this->logger->error('Failed to update metadata', [
+                'exception' => $e
+            ]);
         }
     }
 
@@ -219,7 +229,9 @@ class BookService {
 
             return $metadata;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to load existing metadata: ' . $e->getMessage());
+            $this->logger->error('Failed to load existing metadata', [
+                'exception' => $e
+            ]);
             return [];
         }
     }
@@ -277,7 +289,10 @@ class BookService {
                 }
             }
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to ensure file in database ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to ensure file in database', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
         }
     }
 
@@ -311,9 +326,12 @@ class BookService {
                     'updated_at' => $qb->createNamedParameter(date('Y-m-d H:i:s'))
                 ])
                 ->executeStatement();
-                
+
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to insert file metadata for ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to insert file metadata', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
         }
     }
 
@@ -343,9 +361,12 @@ class BookService {
                 ->set('updated_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
                 ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
                 ->executeStatement();
-                
+
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to update file metadata for ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to update file metadata', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
         }
     }
 
@@ -390,11 +411,13 @@ class BookService {
             
             // Add sync progress if available
             $this->addSyncProgressToMetadata($file, $book);
-            
+
             return $book;
-            
+
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to convert database row to book array: ' . $e->getMessage());
+            $this->logger->error('Failed to convert database row to book array', [
+                'exception' => $e
+            ]);
             return null;
         }
     }
@@ -516,7 +539,10 @@ class BookService {
             }
         } catch (\Exception $e) {
             // If extraction fails, keep the filename-based defaults
-            error_log('eBooks app: Metadata extraction failed for ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Metadata extraction failed', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
         }
 
         return $metadata;
@@ -564,9 +590,12 @@ class BookService {
             } else {
                 $metadata['progress'] = null;
             }
-            
+
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to add sync progress for file ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to add sync progress for file', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
             $metadata['progress'] = null;
         }
     }
@@ -607,7 +636,10 @@ class BookService {
 
             return $hashes;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get document hashes for file ID ' . $fileId . ': ' . $e->getMessage());
+            $this->logger->error('Failed to get document hashes for file', [
+                'file_id' => $fileId,
+                'exception' => $e
+            ]);
             return [];
         }
     }
@@ -635,7 +667,7 @@ class BookService {
 
             return $progress ?: null;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get sync progress for hashes: ' . $e->getMessage());
+            $this->logger->error('Failed to get sync progress for hashes', ['exception' => $e]);
             return null;
         }
     }
@@ -670,7 +702,10 @@ class BookService {
 
             return $storedMetadata ?: null;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to retrieve stored metadata for file ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to retrieve stored metadata for file', [
+                'file_path' => $file->getPath(),
+                'exception' => $e
+            ]);
             return null;
         }
     }
@@ -714,9 +749,11 @@ class BookService {
                     }
                 }
             }
-            
-            unlink($tempFile);
-            
+
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+
         } catch (\Exception $e) {
             // If extraction fails, fall back to filename parsing
             $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
@@ -771,7 +808,7 @@ class BookService {
             
         } catch (\Exception $e) {
             // If extraction fails, keep defaults
-            error_log('CBR metadata extraction failed: ' . $e->getMessage());
+            $this->logger->error('CBR metadata extraction failed', ['exception' => $e]);
         }
     }
 
@@ -783,7 +820,7 @@ class BookService {
             
             $archive = \Kiwilan\Archive\Archive::make($tempFile);
             if (!$archive) {
-                unlink($tempFile);
+                if (file_exists($tempFile)) { unlink($tempFile); }
                 return;
             }
             
@@ -798,14 +835,14 @@ class BookService {
                 }
             }
             
-            unlink($tempFile);
+            if (file_exists($tempFile)) { unlink($tempFile); }
             
             if ($comicInfoXml) {
                 $this->parseComicInfoXml($comicInfoXml, $metadata);
             }
             
         } catch (\Throwable $e) {
-            error_log('ComicInfo.xml extraction failed: ' . $e->getMessage());
+            $this->logger->error('ComicInfo.xml extraction failed', ['exception' => $e]);
         }
     }
     
@@ -867,7 +904,7 @@ class BookService {
             }
             
         } catch (\Exception $e) {
-            error_log('ComicInfo.xml parsing failed: ' . $e->getMessage());
+            $this->logger->error('ComicInfo.xml parsing failed', ['exception' => $e]);
         }
     }
 
@@ -894,7 +931,7 @@ class BookService {
             $this->extractMobiHeader($file, $metadata);
             
         } catch (\Exception $e) {
-            error_log('MOBI metadata extraction failed: ' . $e->getMessage());
+            $this->logger->error('MOBI metadata extraction failed', ['exception' => $e]);
         }
     }
 
@@ -920,7 +957,7 @@ class BookService {
             
         } catch (\Exception $e) {
             // If header reading fails, keep filename-based metadata
-            error_log('MOBI header reading failed: ' . $e->getMessage());
+            $this->logger->error('MOBI header reading failed', ['exception' => $e]);
         }
     }
 
@@ -1005,7 +1042,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get paginated search results: ' . $e->getMessage());
+            $this->logger->error('Failed to get paginated search results', ['exception' => $e]);
             // Fallback to in-memory search
             return $this->searchBooks($query);
         }
@@ -1051,7 +1088,7 @@ class BookService {
             
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get search result count: ' . $e->getMessage());
+            $this->logger->error('Failed to get search result count', ['exception' => $e]);
             // Fallback to in-memory search count
             return count($this->searchBooks($query));
         }
@@ -1143,7 +1180,7 @@ class BookService {
             
             $zip = new \ZipArchive();
             if ($zip->open($tempFile) !== TRUE) {
-                unlink($tempFile);
+                if (file_exists($tempFile)) { unlink($tempFile); }
                 return new DataResponse(['error' => 'Could not read EPUB file'], 500);
             }
             
@@ -1153,7 +1190,7 @@ class BookService {
             if ($coverImage) {
                 $imageContent = $zip->getFromName($coverImage);
                 $zip->close();
-                unlink($tempFile);
+                if (file_exists($tempFile)) { unlink($tempFile); }
                 
                 if ($imageContent) {
                     // Create thumbnail
@@ -1171,7 +1208,7 @@ class BookService {
                         // Clean up temp file after response (Note: this might not work as expected)
                         register_shutdown_function(function() use ($tempThumb) {
                             if (file_exists($tempThumb)) {
-                                unlink($tempThumb);
+                                if (file_exists($tempThumb)) { unlink($tempThumb); }
                             }
                         });
                         
@@ -1181,7 +1218,7 @@ class BookService {
             }
             
             $zip->close();
-            unlink($tempFile);
+            if (file_exists($tempFile)) { unlink($tempFile); }
             
             return new DataResponse(['message' => 'No cover image found'], 404);
             
@@ -1293,7 +1330,7 @@ class BookService {
             
             $archive = \Kiwilan\Archive\Archive::make($tempFile);
             if (!$archive) {
-                unlink($tempFile);
+                if (file_exists($tempFile)) { unlink($tempFile); }
                 return new DataResponse(['error' => 'Could not read CBR file'], 500);
             }
             
@@ -1331,10 +1368,10 @@ class BookService {
                         // Clean up temp files after response
                         register_shutdown_function(function() use ($tempFile, $tempThumb) {
                             if (file_exists($tempFile)) {
-                                unlink($tempFile);
+                                if (file_exists($tempFile)) { unlink($tempFile); }
                             }
                             if (file_exists($tempThumb)) {
-                                unlink($tempThumb);
+                                if (file_exists($tempThumb)) { unlink($tempThumb); }
                             }
                         });
                         
@@ -1343,7 +1380,7 @@ class BookService {
                 }
             }
             
-            unlink($tempFile);
+            if (file_exists($tempFile)) { unlink($tempFile); }
             return new DataResponse(['message' => 'No cover image found'], 404);
             
         } catch (\Exception $e) {
@@ -1541,9 +1578,9 @@ class BookService {
                ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId)))
                ->executeStatement();
             
-            error_log("eBooks app: Successfully removed book metadata and related records for file: " . $file->getPath());
+            $this->logger->info('Successfully removed book metadata and related records', ['file_path' => $file->getPath()]);
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove metadata for file ' . $file->getPath() . ': ' . $e->getMessage());
+            $this->logger->error('Failed to remove metadata for file', ['file_path' => $file->getPath(), 'exception' => $e]);
         }
     }
 
@@ -1564,7 +1601,7 @@ class BookService {
 
             return $metadataId ? (int)$metadataId : null;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to retrieve metadata ID: ' . $e->getMessage());
+            $this->logger->error('Failed to retrieve metadata ID', ['exception' => $e]);
             return null;
         }
     }
@@ -1584,23 +1621,23 @@ class BookService {
                 // Step 2: Remove sync progress for all hashes of this book
                 $this->removeSyncProgressForHashes($documentHashes, $userId);
                 
-                error_log("eBooks app: Removed sync progress for " . count($documentHashes) . " document hashes for metadata_id $metadataId");
+                $this->logger->info('Removed sync progress for document hashes', ['hash_count' => count($documentHashes), 'metadata_id' => $metadataId]);
             }
 
             // Step 3: Remove all hash mappings for this book
             $removedMappings = $this->removeHashMappings($metadataId, $userId);
             
             if ($removedMappings > 0) {
-                error_log("eBooks app: Removed $removedMappings hash mappings for metadata_id $metadataId");
+                $this->logger->info('Removed hash mappings', ['mappings_removed' => $removedMappings, 'metadata_id' => $metadataId]);
             }
 
             $this->db->commit();
             
-            error_log("eBooks app: Successfully cleaned up all references for book metadata_id $metadataId (user: $userId)");
+            $this->logger->info('Successfully cleaned up all references for book', ['metadata_id' => $metadataId, 'user' => $userId]);
             
         } catch (\Exception $e) {
             $this->db->rollBack();
-            error_log('eBooks app: Failed to cleanup book references for metadata_id ' . $metadataId . ': ' . $e->getMessage());
+            $this->logger->error('Failed to cleanup book references', ['metadata_id' => $metadataId, 'exception' => $e]);
         }
     }
 
@@ -1636,19 +1673,19 @@ class BookService {
                         ->executeStatement();
 
                     $cleanedCount++;
-                    error_log("eBooks app: Cleaned up orphaned metadata entry for file_id $fileId (metadata_id $metadataId)");
+                    $this->logger->info('Cleaned up orphaned metadata entry', ['file_id' => $fileId, 'metadata_id' => $metadataId]);
                 }
             }
             $result->closeCursor();
 
             if ($cleanedCount > 0) {
-                error_log("eBooks app: Cleaned up $cleanedCount orphaned metadata entries for user $userId");
+                $this->logger->info('Cleaned up orphaned metadata entries', ['count' => $cleanedCount, 'user' => $userId]);
             }
 
             return $cleanedCount;
 
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to cleanup orphaned metadata for user ' . $userId . ': ' . $e->getMessage());
+            $this->logger->error('Failed to cleanup orphaned metadata', ['user' => $userId, 'exception' => $e]);
             return 0;
         }
     }
@@ -1673,7 +1710,7 @@ class BookService {
 
             return $hashes;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get document hashes for metadata_id ' . $metadataId . ': ' . $e->getMessage());
+            $this->logger->error('Failed to get document hashes', ['metadata_id' => $metadataId, 'exception' => $e]);
             return [];
         }
     }
@@ -1695,7 +1732,7 @@ class BookService {
 
             return $affectedRows;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove sync progress for hashes: ' . $e->getMessage());
+            $this->logger->error('Failed to remove sync progress for hashes', ['exception' => $e]);
             return 0;
         }
     }
@@ -1713,7 +1750,7 @@ class BookService {
 
             return $affectedRows;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove hash mappings for metadata_id ' . $metadataId . ': ' . $e->getMessage());
+            $this->logger->error('Failed to remove hash mappings', ['metadata_id' => $metadataId, 'exception' => $e]);
             return 0;
         }
     }
@@ -1751,7 +1788,7 @@ class BookService {
             
             return $qb->executeQuery()->fetchAll();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get authors: ' . $e->getMessage());
+            $this->logger->error('Failed to get authors', ['exception' => $e]);
             return [];
         }
     }
@@ -1790,7 +1827,7 @@ class BookService {
 
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get authors count: ' . $e->getMessage());
+            $this->logger->error('Failed to get authors count', ['exception' => $e]);
             return 0;
         }
     }
@@ -1847,7 +1884,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by author: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by author', ['exception' => $e]);
             return [];
         }
     }
@@ -1872,7 +1909,7 @@ class BookService {
             
             return (int)$qb->executeQuery()->fetchOne();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by author count: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by author count', ['exception' => $e]);
             return 0;
         }
     }
@@ -1908,7 +1945,7 @@ class BookService {
             
             return $qb->executeQuery()->fetchAll();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get series: ' . $e->getMessage());
+            $this->logger->error('Failed to get series', ['exception' => $e]);
             return [];
         }
     }
@@ -1947,7 +1984,7 @@ class BookService {
 
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get series count: ' . $e->getMessage());
+            $this->logger->error('Failed to get series count', ['exception' => $e]);
             return 0;
         }
     }
@@ -1992,7 +2029,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by series: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by series', ['exception' => $e]);
             return [];
         }
     }
@@ -2017,7 +2054,7 @@ class BookService {
             
             return (int)$qb->executeQuery()->fetchOne();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by series count: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by series count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2053,7 +2090,7 @@ class BookService {
             
             return $qb->executeQuery()->fetchAll();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get genres: ' . $e->getMessage());
+            $this->logger->error('Failed to get genres', ['exception' => $e]);
             return [];
         }
     }
@@ -2092,7 +2129,7 @@ class BookService {
 
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get genres count: ' . $e->getMessage());
+            $this->logger->error('Failed to get genres count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2152,7 +2189,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by genre: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by genre', ['exception' => $e]);
             return [];
         }
     }
@@ -2177,7 +2214,7 @@ class BookService {
             
             return (int)$qb->executeQuery()->fetchOne();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by genre count: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by genre count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2213,7 +2250,7 @@ class BookService {
             
             return $qb->executeQuery()->fetchAll();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get formats: ' . $e->getMessage());
+            $this->logger->error('Failed to get formats', ['exception' => $e]);
             return [];
         }
     }
@@ -2252,7 +2289,7 @@ class BookService {
 
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get formats count: ' . $e->getMessage());
+            $this->logger->error('Failed to get formats count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2312,7 +2349,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by format: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by format', ['exception' => $e]);
             return [];
         }
     }
@@ -2337,7 +2374,7 @@ class BookService {
             
             return (int)$qb->executeQuery()->fetchOne();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by format count: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by format count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2373,7 +2410,7 @@ class BookService {
             
             return $qb->executeQuery()->fetchAll();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get languages: ' . $e->getMessage());
+            $this->logger->error('Failed to get languages', ['exception' => $e]);
             return [];
         }
     }
@@ -2412,7 +2449,7 @@ class BookService {
 
             return $count;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get languages count: ' . $e->getMessage());
+            $this->logger->error('Failed to get languages count', ['exception' => $e]);
             return 0;
         }
     }
@@ -2472,7 +2509,7 @@ class BookService {
             return $books;
             
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by language: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by language', ['exception' => $e]);
             return [];
         }
     }
@@ -2497,7 +2534,7 @@ class BookService {
             
             return (int)$qb->executeQuery()->fetchOne();
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get books by language count: ' . $e->getMessage());
+            $this->logger->error('Failed to get books by language count', ['exception' => $e]);
             return 0;
         }
     }

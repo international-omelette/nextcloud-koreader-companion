@@ -8,6 +8,7 @@ use OCP\Files\Events\Node\NodeDeletedEvent;
 use OCP\IConfig;
 use OCP\IUserSession;
 use OCP\IDBConnection;
+use Psr\Log\LoggerInterface;
 
 /**
  * Listens for file deletion events to clean up related database records
@@ -18,15 +19,18 @@ class FileDeleteListener implements IEventListener {
     private $config;
     private $userSession;
     private $db;
+    private LoggerInterface $logger;
 
     public function __construct(
         IConfig $config,
         IUserSession $userSession,
-        IDBConnection $db
+        IDBConnection $db,
+        LoggerInterface $logger
     ) {
         $this->config = $config;
         $this->userSession = $userSession;
         $this->db = $db;
+        $this->logger = $logger;
     }
 
     public function handle(Event $event): void {
@@ -97,30 +101,44 @@ class FileDeleteListener implements IEventListener {
                     // Remove sync progress for all hashes of this book
                     $progressRemoved = $this->removeSyncProgressForHashes($documentHashes, $userId);
                     if ($progressRemoved > 0) {
-                        error_log("eBooks app: File deletion cleanup - removed $progressRemoved sync progress records for file: $filePath");
+                        $this->logger->info('File deletion cleanup - removed sync progress records', [
+                            'records_removed' => $progressRemoved,
+                            'file_path' => $filePath
+                        ]);
                     }
                 }
 
                 // Remove all hash mappings for this book
                 $mappingsRemoved = $this->removeHashMappings($metadataId, $userId);
                 if ($mappingsRemoved > 0) {
-                    error_log("eBooks app: File deletion cleanup - removed $mappingsRemoved hash mappings for file: $filePath");
+                    $this->logger->info('File deletion cleanup - removed hash mappings', [
+                        'mappings_removed' => $mappingsRemoved,
+                        'file_path' => $filePath
+                    ]);
                 }
 
                 // Remove metadata record
                 $metadataRemoved = $this->removeMetadata($userId, $fileId);
                 if ($metadataRemoved > 0) {
-                    error_log("eBooks app: File deletion cleanup - removed metadata for file: $filePath");
+                    $this->logger->info('File deletion cleanup - removed metadata', [
+                        'file_path' => $filePath
+                    ]);
                 }
             }
 
             $this->db->commit();
-            
-            error_log("eBooks app: Successfully cleaned up all database references for deleted file: $filePath (user: $userId)");
-            
+
+            $this->logger->info('Successfully cleaned up all database references for deleted file', [
+                'file_path' => $filePath,
+                'user' => $userId
+            ]);
+
         } catch (\Exception $e) {
             $this->db->rollBack();
-            error_log('eBooks app: Failed to cleanup references for deleted file ' . $filePath . ': ' . $e->getMessage());
+            $this->logger->error('Failed to cleanup references for deleted file', [
+                'file_path' => $filePath,
+                'exception' => $e
+            ]);
         }
     }
 
@@ -138,7 +156,9 @@ class FileDeleteListener implements IEventListener {
 
             return $metadataId ? (int)$metadataId : null;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to retrieve metadata ID in file deletion cleanup: ' . $e->getMessage());
+            $this->logger->error('Failed to retrieve metadata ID in file deletion cleanup', [
+                'exception' => $e
+            ]);
             return null;
         }
     }
@@ -160,7 +180,9 @@ class FileDeleteListener implements IEventListener {
 
             return $hashes;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to get document hashes in file deletion cleanup: ' . $e->getMessage());
+            $this->logger->error('Failed to get document hashes in file deletion cleanup', [
+                'exception' => $e
+            ]);
             return [];
         }
     }
@@ -179,7 +201,9 @@ class FileDeleteListener implements IEventListener {
 
             return $affectedRows;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove sync progress in file deletion cleanup: ' . $e->getMessage());
+            $this->logger->error('Failed to remove sync progress in file deletion cleanup', [
+                'exception' => $e
+            ]);
             return 0;
         }
     }
@@ -194,7 +218,9 @@ class FileDeleteListener implements IEventListener {
 
             return $affectedRows;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove hash mappings in file deletion cleanup: ' . $e->getMessage());
+            $this->logger->error('Failed to remove hash mappings in file deletion cleanup', [
+                'exception' => $e
+            ]);
             return 0;
         }
     }
@@ -209,7 +235,9 @@ class FileDeleteListener implements IEventListener {
 
             return $affectedRows;
         } catch (\Exception $e) {
-            error_log('eBooks app: Failed to remove metadata in file deletion cleanup: ' . $e->getMessage());
+            $this->logger->error('Failed to remove metadata in file deletion cleanup', [
+                'exception' => $e
+            ]);
             return 0;
         }
     }
