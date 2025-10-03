@@ -60,3 +60,6 @@ Check all added comments if they are redundant (if the code is self explanatory)
 - GitHub releases are created automatically
 - Tarballs are built and attached to releases
 - Version in info.xml is updated automatically
+
+### After committing
+- Launch a subagent to update @CLAUDE.md

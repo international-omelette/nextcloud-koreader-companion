@@ -119,6 +119,7 @@ css/books.css       # Nextcloud-style responsive design
 - ❌ Don't use inline event handlers (CSP violation)
 - ❌ Don't assume libraries exist (check `composer.json`)
 - ❌ Don't store passwords in database (use `oc_preferences`)
+- ❌ Don't use app-level config in event listeners (extract userId from path for per-user settings)
 - ❌ Don't create files when editing works
 - ❌ Don't add Claude Code refs to commits
 - ❌ Don't work on multiple tasks simultaneously
