@@ -2,7 +2,6 @@
 namespace OCA\KoreaderCompanion\Listener;
 
 use OCA\KoreaderCompanion\Service\BookService;
-use OCA\KoreaderCompanion\Service\FileTrackingService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\Files\Events\Node\NodeDeletedEvent;
@@ -18,18 +17,15 @@ class FileDeleteListener implements IEventListener {
 
     private $config;
     private $userSession;
-    private $fileTrackingService;
     private $db;
 
     public function __construct(
         IConfig $config,
         IUserSession $userSession,
-        FileTrackingService $fileTrackingService,
         IDBConnection $db
     ) {
         $this->config = $config;
         $this->userSession = $userSession;
-        $this->fileTrackingService = $fileTrackingService;
         $this->db = $db;
     }
 
@@ -39,33 +35,35 @@ class FileDeleteListener implements IEventListener {
         }
 
         $node = $event->getNode();
-        
-        // Only process files (not directories)
+
         if ($node->getType() !== \OCP\Files\FileInfo::TYPE_FILE) {
             return;
         }
 
-        // Check if this is an ebook file in the configured Books folder
         if (!$this->isEbookInBooksFolder($node)) {
             return;
         }
 
-        // Extract user ID from file path
         $userId = $this->extractUserIdFromPath($node->getPath());
         if (!$userId) {
             return;
         }
 
         $fileId = $node->getId();
-        
-        // Clean up all related database records
         $this->cleanupFileReferences($fileId, $userId, $node->getPath());
     }
 
     private function isEbookInBooksFolder($node): bool {
         $path = $node->getPath();
-        $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
-        
+
+        // Extract user ID from path to get their configured folder
+        $userId = $this->extractUserIdFromPath($path);
+        if (!$userId) {
+            return false;
+        }
+
+        $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
+
         // Check if file is in the configured eBooks folder
         if (strpos($path, "/files/$folderName/") === false) {
             return false;
@@ -115,9 +113,6 @@ class FileDeleteListener implements IEventListener {
                     error_log("eBooks app: File deletion cleanup - removed metadata for file: $filePath");
                 }
             }
-
-            // Remove file tracking record
-            $this->fileTrackingService->removeFileTracking($fileId, $userId);
 
             $this->db->commit();
             

@@ -46,7 +46,14 @@ class FileCreationListener implements IEventListener {
 
     private function isEbookInBooksFolder($node): bool {
         $path = $node->getPath();
-        $folderName = $this->config->getAppValue('koreader_companion', 'folder', 'eBooks');
+
+        // Extract user ID from path to get their configured folder
+        $userId = $this->extractUserIdFromPath($path);
+        if (!$userId) {
+            return false;
+        }
+
+        $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
 
         if (strpos($path, "/files/$folderName/") === false) {
             return false;
