@@ -1,0 +1,36 @@
+services:
+  db:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=example
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=nextcloud
+    volumes:
+      - db-data:/var/lib/mysql
+
+  app:
+    image: nextcloud:stable
+    ports:
+      - "8080:80"
+    links:
+      - db
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=nextcloud
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=admin
+    volumes:
+      - nextcloud-data:/var/www/html
+      # Do not bind-mount the app during initialization. We'll copy it into the container after Nextcloud is running.
+      # - ./nextcloud-ebooks-poc:/var/www/html/apps/ebooks_poc:cached
+      # If you prefer to develop with a bind mount, uncomment the line above, but be aware of rsync/init conflicts.
+    depends_on:
+      - db
+
+volumes:
+  db-data:
+  nextcloud-data:

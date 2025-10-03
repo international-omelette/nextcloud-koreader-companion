@@ -27,3 +27,7 @@ Thumbs.db
 # Nextcloud specific
 /build/
 /node_modules/
+
+# AI development tools
+.claude/settings.local.json
+.playwright-mcp/
