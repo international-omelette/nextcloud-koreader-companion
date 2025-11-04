@@ -94,9 +94,9 @@ class FileDeleteListener implements IEventListener {
             $metadataId = $this->getMetadataId($userId, $fileId);
             
             if ($metadataId) {
-                // Get all document hashes for this book from hash mappings
+                // Get all document hashes for this book from metadata
                 $documentHashes = $this->getDocumentHashesForBook($metadataId, $userId);
-                
+
                 if (!empty($documentHashes)) {
                     // Remove sync progress for all hashes of this book
                     $progressRemoved = $this->removeSyncProgressForHashes($documentHashes, $userId);
@@ -106,15 +106,6 @@ class FileDeleteListener implements IEventListener {
                             'file_path' => $filePath
                         ]);
                     }
-                }
-
-                // Remove all hash mappings for this book
-                $mappingsRemoved = $this->removeHashMappings($metadataId, $userId);
-                if ($mappingsRemoved > 0) {
-                    $this->logger->info('File deletion cleanup - removed hash mappings', [
-                        'mappings_removed' => $mappingsRemoved,
-                        'file_path' => $filePath
-                    ]);
                 }
 
                 // Remove metadata record
@@ -166,17 +157,26 @@ class FileDeleteListener implements IEventListener {
     private function getDocumentHashesForBook(int $metadataId, string $userId): array {
         try {
             $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('document_hash')
-                ->from('koreader_hash_mapping')
-                ->where($qb->expr()->eq('metadata_id', $qb->createNamedParameter($metadataId)))
+            $result = $qb->select('binary_hash', 'filename_hash')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
                 ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
                 ->executeQuery();
 
-            $hashes = [];
-            while ($row = $result->fetch()) {
-                $hashes[] = $row['document_hash'];
-            }
+            $row = $result->fetch();
             $result->closeCursor();
+
+            if (!$row) {
+                return [];
+            }
+
+            $hashes = [];
+            if (!empty($row['binary_hash'])) {
+                $hashes[] = $row['binary_hash'];
+            }
+            if (!empty($row['filename_hash'])) {
+                $hashes[] = $row['filename_hash'];
+            }
 
             return $hashes;
         } catch (\Exception $e) {
@@ -202,23 +202,6 @@ class FileDeleteListener implements IEventListener {
             return $affectedRows;
         } catch (\Exception $e) {
             $this->logger->error('Failed to remove sync progress in file deletion cleanup', [
-                'exception' => $e
-            ]);
-            return 0;
-        }
-    }
-
-    private function removeHashMappings(int $metadataId, string $userId): int {
-        try {
-            $qb = $this->db->getQueryBuilder();
-            $affectedRows = $qb->delete('koreader_hash_mapping')
-               ->where($qb->expr()->eq('metadata_id', $qb->createNamedParameter($metadataId)))
-               ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-               ->executeStatement();
-
-            return $affectedRows;
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to remove hash mappings in file deletion cleanup', [
                 'exception' => $e
             ]);
             return 0;

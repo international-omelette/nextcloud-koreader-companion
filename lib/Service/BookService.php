@@ -1614,27 +1614,20 @@ class BookService {
             // Begin transaction to ensure atomic cleanup
             $this->db->beginTransaction();
 
-            // Step 1: Get all document hashes for this book from hash mappings
+            // Get all document hashes for this book from metadata
             $documentHashes = $this->getDocumentHashesForBook($metadataId, $userId);
-            
+
             if (!empty($documentHashes)) {
-                // Step 2: Remove sync progress for all hashes of this book
+                // Remove sync progress for all hashes of this book
                 $this->removeSyncProgressForHashes($documentHashes, $userId);
-                
+
                 $this->logger->info('Removed sync progress for document hashes', ['hash_count' => count($documentHashes), 'metadata_id' => $metadataId]);
             }
 
-            // Step 3: Remove all hash mappings for this book
-            $removedMappings = $this->removeHashMappings($metadataId, $userId);
-            
-            if ($removedMappings > 0) {
-                $this->logger->info('Removed hash mappings', ['mappings_removed' => $removedMappings, 'metadata_id' => $metadataId]);
-            }
-
             $this->db->commit();
-            
+
             $this->logger->info('Successfully cleaned up all references for book', ['metadata_id' => $metadataId, 'user' => $userId]);
-            
+
         } catch (\Exception $e) {
             $this->db->rollBack();
             $this->logger->error('Failed to cleanup book references', ['metadata_id' => $metadataId, 'exception' => $e]);
@@ -1696,17 +1689,26 @@ class BookService {
     private function getDocumentHashesForBook(int $metadataId, string $userId): array {
         try {
             $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('document_hash')
-                ->from('koreader_hash_mapping')
-                ->where($qb->expr()->eq('metadata_id', $qb->createNamedParameter($metadataId)))
+            $result = $qb->select('binary_hash', 'filename_hash')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
                 ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
                 ->executeQuery();
 
-            $hashes = [];
-            while ($row = $result->fetch()) {
-                $hashes[] = $row['document_hash'];
-            }
+            $row = $result->fetch();
             $result->closeCursor();
+
+            if (!$row) {
+                return [];
+            }
+
+            $hashes = [];
+            if (!empty($row['binary_hash'])) {
+                $hashes[] = $row['binary_hash'];
+            }
+            if (!empty($row['filename_hash'])) {
+                $hashes[] = $row['filename_hash'];
+            }
 
             return $hashes;
         } catch (\Exception $e) {
@@ -1733,24 +1735,6 @@ class BookService {
             return $affectedRows;
         } catch (\Exception $e) {
             $this->logger->error('Failed to remove sync progress for hashes', ['exception' => $e]);
-            return 0;
-        }
-    }
-
-    /**
-     * Remove all hash mappings for a book
-     */
-    private function removeHashMappings(int $metadataId, string $userId): int {
-        try {
-            $qb = $this->db->getQueryBuilder();
-            $affectedRows = $qb->delete('koreader_hash_mapping')
-               ->where($qb->expr()->eq('metadata_id', $qb->createNamedParameter($metadataId)))
-               ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-               ->executeStatement();
-
-            return $affectedRows;
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to remove hash mappings', ['metadata_id' => $metadataId, 'exception' => $e]);
             return 0;
         }
     }

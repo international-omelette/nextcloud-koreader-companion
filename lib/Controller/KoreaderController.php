@@ -78,16 +78,16 @@ class KoreaderController extends Controller {
         
         // First try to get progress using the document hash directly
         $progress = $this->getDocumentProgress($syncUser['id'], $document);
-        
-        // If not found, try to find the document by hash and create mapping
+
+        // If not found, try to find the document by hash
         if (!$progress) {
             $bookInfo = $this->findBookByHash($document, $syncUser['id']);
             if (!$bookInfo) {
                 $this->logUnknownDocument($document, $syncUser['id']);
                 return $this->createKoreaderResponse(['message' => 'Document not found'], 404);
             }
-            
-            // Try again with the mapped document hash
+
+            // Try again now that we've verified the book exists
             $progress = $this->getDocumentProgress($syncUser['id'], $document);
         }
         
@@ -130,7 +130,7 @@ class KoreaderController extends Controller {
             return $this->createKoreaderResponse(['error' => 'Document hash required'], 400);
         }
         
-        // Try to find the document by hash to ensure it exists and create mapping if needed
+        // Try to find the document by hash to ensure it exists and update hashes if needed
         $bookInfo = $this->findBookByHash($document, $syncUser['id']);
         if (!$bookInfo) {
             // Document not found - try auto-indexing
@@ -268,7 +268,7 @@ class KoreaderController extends Controller {
     }
 
     /**
-     * Find a book by its document hash using the hash mapping table
+     * Find a book by its document hash using direct metadata query
      *
      * @param string $documentHash MD5 hash from KOReader
      * @param string $userId Nextcloud username
@@ -277,28 +277,39 @@ class KoreaderController extends Controller {
     private function findBookByHash(string $documentHash, string $userId): ?array {
         try {
             $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('hm.metadata_id', 'hm.hash_type', 'em.file_id', 'em.title', 'em.author')
-                ->from('koreader_hash_mapping', 'hm')
-                ->innerJoin('hm', 'koreader_metadata', 'em', 'hm.metadata_id = em.id')
-                ->where($qb->expr()->eq('hm.user_id', $qb->createNamedParameter($userId)))
-                ->andWhere($qb->expr()->eq('hm.document_hash', $qb->createNamedParameter($documentHash)))
+            $result = $qb->select('id', 'file_id', 'title', 'author', 'binary_hash', 'filename_hash')
+                ->from('koreader_metadata')
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                ->andWhere(
+                    $qb->expr()->orX(
+                        $qb->expr()->eq('binary_hash', $qb->createNamedParameter($documentHash)),
+                        $qb->expr()->eq('filename_hash', $qb->createNamedParameter($documentHash))
+                    )
+                )
+                ->setMaxResults(1)
                 ->executeQuery();
 
             $row = $result->fetch();
             $result->closeCursor();
 
             if ($row) {
-                $this->logger->info('Found book by hash in mapping table', [
+                $hashType = ($row['binary_hash'] === $documentHash) ? 'binary' : 'filename';
+
+                $this->logger->info('Found book by hash in metadata', [
                     'hash' => $documentHash,
                     'user' => $userId,
                     'title' => $row['title'],
-                    'hash_type' => $row['hash_type']
+                    'hash_type' => $hashType
                 ]);
+
+                // Add metadata_id for backward compatibility
+                $row['metadata_id'] = $row['id'];
+                $row['hash_type'] = $hashType;
+
                 return $row;
             }
 
-            // Not found in mapping table - let's check if we can find it by scanning books
-            $this->logger->info('Book not found in hash mapping table', [
+            $this->logger->info('Book not found in metadata', [
                 'hash' => $documentHash,
                 'user' => $userId
             ]);
@@ -361,7 +372,7 @@ class KoreaderController extends Controller {
                     // Check if either hash matches
                     if ($binaryHash === $documentHash || $filenameHash === $documentHash) {
                         $hashType = ($binaryHash === $documentHash) ? 'binary' : 'filename';
-                        
+
                         $this->logger->info('Auto-indexing document found match', [
                             'hash' => $documentHash,
                             'user' => $userId,
@@ -375,9 +386,9 @@ class KoreaderController extends Controller {
                             continue;
                         }
 
-                        // Create hash mapping
-                        $this->createHashMapping($userId, $documentHash, $hashType, $metadataId);
-                        
+                        // Update hash columns in metadata record
+                        $this->updateMetadataHashes($metadataId, $binaryHash, $filenameHash);
+
                         return true;
                     }
                     
@@ -467,41 +478,39 @@ class KoreaderController extends Controller {
     }
 
     /**
-     * Create hash mapping entry
+     * Update hash columns in metadata record
      *
-     * @param string $userId Nextcloud username
-     * @param string $documentHash Document hash
-     * @param string $hashType Type of hash (binary or filename)
      * @param int $metadataId Metadata record ID
+     * @param string|null $binaryHash Binary hash to store
+     * @param string|null $filenameHash Filename hash to store
      * @return bool True on success, false on failure
      */
-    private function createHashMapping(string $userId, string $documentHash, string $hashType, int $metadataId): bool {
+    private function updateMetadataHashes(int $metadataId, ?string $binaryHash, ?string $filenameHash): bool {
         try {
             $qb = $this->db->getQueryBuilder();
-            $qb->insert('koreader_hash_mapping')
-                ->values([
-                    'user_id' => $qb->createNamedParameter($userId),
-                    'document_hash' => $qb->createNamedParameter($documentHash),
-                    'hash_type' => $qb->createNamedParameter($hashType),
-                    'metadata_id' => $qb->createNamedParameter($metadataId),
-                    'created_at' => $qb->createNamedParameter(date('Y-m-d H:i:s'))
-                ])
-                ->executeStatement();
+            $qb->update('koreader_metadata')
+                ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)));
 
-            $this->logger->info('Created hash mapping entry', [
-                'user' => $userId,
-                'hash' => $documentHash,
-                'hash_type' => $hashType,
-                'metadata_id' => $metadataId
+            if ($binaryHash !== null) {
+                $qb->set('binary_hash', $qb->createNamedParameter($binaryHash));
+            }
+
+            if ($filenameHash !== null) {
+                $qb->set('filename_hash', $qb->createNamedParameter($filenameHash));
+            }
+
+            $qb->executeStatement();
+
+            $this->logger->info('Updated metadata hashes', [
+                'metadata_id' => $metadataId,
+                'binary_hash' => $binaryHash,
+                'filename_hash' => $filenameHash
             ]);
 
             return true;
 
         } catch (\Exception $e) {
-            $this->logger->error('Error creating hash mapping', [
-                'user' => $userId,
-                'hash' => $documentHash,
-                'hash_type' => $hashType,
+            $this->logger->error('Error updating metadata hashes', [
                 'metadata_id' => $metadataId,
                 'error' => $e->getMessage()
             ]);
@@ -519,9 +528,9 @@ class KoreaderController extends Controller {
         $this->logger->warning('Unknown document hash in KOReader sync', [
             'hash' => $documentHash,
             'user' => $userId,
-            'message' => 'Document not found in hash mapping table and auto-indexing failed'
+            'message' => 'Document not found in metadata and auto-indexing failed'
         ]);
-        
+
         // Could also implement additional logging to a separate table for analytics
         // or administrative purposes if needed
     }

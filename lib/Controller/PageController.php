@@ -636,10 +636,10 @@ class PageController extends Controller {
     }
 
     /**
-     * Update filename hash mapping when a file is renamed
+     * Update filename hash when a file is renamed
      *
      * This is critical for KOReader sync - when files are renamed, the filename hash changes
-     * and KOReader sync will break unless we update the hash mapping table.
+     * and KOReader sync will break unless we update the filename_hash in metadata.
      */
     private function updateHashMappingAfterRename($file, $userId) {
         try {
@@ -672,28 +672,27 @@ class PageController extends Controller {
                 return;
             }
 
-            // Update the filename hash mapping (if it exists)
+            // Update the filename hash in metadata
             $updateQb = $this->db->getQueryBuilder();
-            $updatedRows = $updateQb->update('koreader_hash_mapping')
-                ->set('document_hash', $updateQb->createNamedParameter($newFilenameHash))
-                ->where($updateQb->expr()->eq('user_id', $updateQb->createNamedParameter($userId)))
-                ->andWhere($updateQb->expr()->eq('metadata_id', $updateQb->createNamedParameter($metadataId)))
-                ->andWhere($updateQb->expr()->eq('hash_type', $updateQb->createNamedParameter('filename')))
+            $updatedRows = $updateQb->update('koreader_metadata')
+                ->set('filename_hash', $updateQb->createNamedParameter($newFilenameHash))
+                ->where($updateQb->expr()->eq('id', $updateQb->createNamedParameter($metadataId)))
+                ->andWhere($updateQb->expr()->eq('user_id', $updateQb->createNamedParameter($userId)))
                 ->executeStatement();
 
             if ($updatedRows > 0) {
-                $this->logger->info('Updated filename hash mapping after rename', [
+                $this->logger->info('Updated filename hash after rename', [
                     'file_name' => $file->getName(),
                     'new_hash' => $newFilenameHash
                 ]);
             } else {
-                $this->logger->info('No filename hash mapping to update after rename', [
+                $this->logger->info('No metadata to update after rename', [
                     'file_name' => $file->getName()
                 ]);
             }
 
         } catch (\Exception $e) {
-            $this->logger->error('Failed to update hash mapping after rename', [
+            $this->logger->error('Failed to update filename hash after rename', [
                 'exception' => $e
             ]);
         }

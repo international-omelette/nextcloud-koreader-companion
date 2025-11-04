@@ -352,9 +352,6 @@ class GenerateBookHashesCommand extends Command {
 
             $updateQb->executeStatement();
 
-            // Create entries in the hash mapping table
-            $this->createHashMappings($bookId, $userId, $binaryHash, $filenameHash);
-
             if ($showDetails) {
                 $hashInfo = [];
                 if ($binaryHash) {
@@ -385,54 +382,4 @@ class GenerateBookHashesCommand extends Command {
         }
     }
 
-    /**
-     * Create hash mapping entries in the database
-     */
-    private function createHashMappings(int $metadataId, string $userId, ?string $binaryHash, ?string $filenameHash): void {
-        $now = new \DateTime();
-
-        if ($binaryHash) {
-            // Delete existing binary hash mapping for this user/hash combination
-            $deleteQb = $this->db->getQueryBuilder();
-            $deleteQb->delete('koreader_hash_mapping')
-                    ->where($deleteQb->expr()->eq('user_id', $deleteQb->createNamedParameter($userId)))
-                    ->andWhere($deleteQb->expr()->eq('document_hash', $deleteQb->createNamedParameter($binaryHash)))
-                    ->andWhere($deleteQb->expr()->eq('hash_type', $deleteQb->createNamedParameter('binary')));
-            $deleteQb->executeStatement();
-
-            // Insert new binary hash mapping
-            $insertQb = $this->db->getQueryBuilder();
-            $insertQb->insert('koreader_hash_mapping')
-                    ->values([
-                        'user_id' => $insertQb->createNamedParameter($userId),
-                        'document_hash' => $insertQb->createNamedParameter($binaryHash),
-                        'hash_type' => $insertQb->createNamedParameter('binary'),
-                        'metadata_id' => $insertQb->createNamedParameter($metadataId, IQueryBuilder::PARAM_INT),
-                        'created_at' => $insertQb->createNamedParameter($now, IQueryBuilder::PARAM_DATE)
-                    ]);
-            $insertQb->executeStatement();
-        }
-
-        if ($filenameHash) {
-            // Delete existing filename hash mapping for this user/hash combination
-            $deleteQb = $this->db->getQueryBuilder();
-            $deleteQb->delete('koreader_hash_mapping')
-                    ->where($deleteQb->expr()->eq('user_id', $deleteQb->createNamedParameter($userId)))
-                    ->andWhere($deleteQb->expr()->eq('document_hash', $deleteQb->createNamedParameter($filenameHash)))
-                    ->andWhere($deleteQb->expr()->eq('hash_type', $deleteQb->createNamedParameter('filename')));
-            $deleteQb->executeStatement();
-
-            // Insert new filename hash mapping
-            $insertQb = $this->db->getQueryBuilder();
-            $insertQb->insert('koreader_hash_mapping')
-                    ->values([
-                        'user_id' => $insertQb->createNamedParameter($userId),
-                        'document_hash' => $insertQb->createNamedParameter($filenameHash),
-                        'hash_type' => $insertQb->createNamedParameter('filename'),
-                        'metadata_id' => $insertQb->createNamedParameter($metadataId, IQueryBuilder::PARAM_INT),
-                        'created_at' => $insertQb->createNamedParameter($now, IQueryBuilder::PARAM_DATE)
-                    ]);
-            $insertQb->executeStatement();
-        }
-    }
 }
