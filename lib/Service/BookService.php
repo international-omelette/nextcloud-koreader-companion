@@ -17,6 +17,7 @@ class BookService {
     private $userSession;
     private $db;
     private $pdfExtractor;
+    private DocumentHashGenerator $hashGenerator;
     private LoggerInterface $logger;
 
     public function __construct(
@@ -25,6 +26,7 @@ class BookService {
         IUserSession $userSession,
         IDBConnection $db,
         PdfMetadataExtractor $pdfExtractor,
+        DocumentHashGenerator $hashGenerator,
         LoggerInterface $logger
     ) {
         $this->rootFolder = $rootFolder;
@@ -32,6 +34,7 @@ class BookService {
         $this->userSession = $userSession;
         $this->db = $db;
         $this->pdfExtractor = $pdfExtractor;
+        $this->hashGenerator = $hashGenerator;
         $this->logger = $logger;
     }
 
@@ -302,7 +305,7 @@ class BookService {
     private function insertFileMetadata(Node $file, $userId) {
         try {
             $metadata = $this->extractMetadata($file);
-            
+
             $qb = $this->db->getQueryBuilder();
             $qb->insert('koreader_metadata')
                 ->values([
@@ -327,6 +330,11 @@ class BookService {
                 ])
                 ->executeStatement();
 
+            $metadataId = $this->db->lastInsertId('oc_koreader_metadata');
+
+            // Generate and store KOReader document hashes
+            $this->createHashMappingsForFile($file, $userId, $metadataId);
+
         } catch (\Exception $e) {
             $this->logger->error('Failed to insert file metadata', [
                 'file_path' => $file->getPath(),
@@ -341,7 +349,7 @@ class BookService {
     private function updateFileMetadata(Node $file, $userId, $metadataId) {
         try {
             $metadata = $this->extractMetadata($file);
-            
+
             $qb = $this->db->getQueryBuilder();
             $qb->update('koreader_metadata')
                 ->set('file_path', $qb->createNamedParameter($file->getPath()))
@@ -361,6 +369,9 @@ class BookService {
                 ->set('updated_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
                 ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
                 ->executeStatement();
+
+            // Regenerate KOReader document hashes (file may have changed)
+            $this->createHashMappingsForFile($file, $userId, $metadataId);
 
         } catch (\Exception $e) {
             $this->logger->error('Failed to update file metadata', [
@@ -1752,6 +1763,77 @@ class BookService {
         } catch (\Exception $e) {
             $this->logger->error('Failed to remove hash mappings', ['metadata_id' => $metadataId, 'exception' => $e]);
             return 0;
+        }
+    }
+
+    /**
+     * Create hash mappings for a file
+     * Generates both binary and filename hashes and stores them in koreader_hash_mapping table
+     */
+    private function createHashMappingsForFile(Node $file, string $userId, int $metadataId): void {
+        try {
+            // Generate document hashes
+            $hashes = $this->hashGenerator->generateDocumentHashesFromNode($file);
+            $binaryHash = $hashes['binary_hash'] ?? null;
+            $filenameHash = $hashes['filename_hash'] ?? null;
+
+            if (!$binaryHash && !$filenameHash) {
+                $this->logger->warning('Failed to generate hashes for file', [
+                    'file_path' => $file->getPath(),
+                    'user_id' => $userId,
+                    'metadata_id' => $metadataId
+                ]);
+                return;
+            }
+
+            // Remove existing hash mappings for this metadata record
+            $this->removeHashMappings($metadataId, $userId);
+
+            $now = date('Y-m-d H:i:s');
+
+            // Insert binary hash mapping
+            if ($binaryHash) {
+                $qb = $this->db->getQueryBuilder();
+                $qb->insert('koreader_hash_mapping')
+                    ->values([
+                        'user_id' => $qb->createNamedParameter($userId),
+                        'document_hash' => $qb->createNamedParameter($binaryHash),
+                        'hash_type' => $qb->createNamedParameter('binary'),
+                        'metadata_id' => $qb->createNamedParameter($metadataId),
+                        'created_at' => $qb->createNamedParameter($now)
+                    ])
+                    ->executeStatement();
+            }
+
+            // Insert filename hash mapping
+            if ($filenameHash) {
+                $qb = $this->db->getQueryBuilder();
+                $qb->insert('koreader_hash_mapping')
+                    ->values([
+                        'user_id' => $qb->createNamedParameter($userId),
+                        'document_hash' => $qb->createNamedParameter($filenameHash),
+                        'hash_type' => $qb->createNamedParameter('filename'),
+                        'metadata_id' => $qb->createNamedParameter($metadataId),
+                        'created_at' => $qb->createNamedParameter($now)
+                    ])
+                    ->executeStatement();
+            }
+
+            $this->logger->info('Created hash mappings for file', [
+                'file_path' => $file->getPath(),
+                'user_id' => $userId,
+                'metadata_id' => $metadataId,
+                'binary_hash' => $binaryHash,
+                'filename_hash' => $filenameHash
+            ]);
+
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to create hash mappings', [
+                'file_path' => $file->getPath(),
+                'user_id' => $userId,
+                'metadata_id' => $metadataId,
+                'exception' => $e->getMessage()
+            ]);
         }
     }
 
