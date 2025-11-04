@@ -32,7 +32,8 @@ Authentication:
 
 Data Flow:
   File Upload → FileCreationListener → BookService.extractMetadata()
-             → Store in oc_koreader_books (key: file_id)
+             → Store in oc_koreader_metadata (key: file_id)
+             → Generate hashes → Store in oc_koreader_hash_mapping
   OPDS Request → OpdsController → BookService.getBooks() → XML feed
   Sync Request → KoreaderController → Hash validation → oc_koreader_progress
 
@@ -84,7 +85,8 @@ css/books.css       # Nextcloud-style responsive design
 - `info.xml` - App metadata, NC version compat
 
 **Database**:
-- `oc_koreader_books` - Metadata cache (file_id primary key)
+- `oc_koreader_metadata` - Metadata cache (file_id primary key)
+- `oc_koreader_hash_mapping` - Document hash mappings (auto-generated on upload)
 - `oc_koreader_progress` - Reading positions
 - `oc_preferences` - User settings (folder, password)
 
