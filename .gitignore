@@ -31,3 +31,5 @@ Thumbs.db
 # AI development tools
 .claude/settings.local.json
 .playwright-mcp/
+
+certificates

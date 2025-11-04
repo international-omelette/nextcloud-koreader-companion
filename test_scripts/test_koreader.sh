@@ -225,7 +225,7 @@ fi
 
 # Test GET progress for the document we just updated
 response=$(koreader_request "GET" "/sync/syncs/progress/$TEST_DOCUMENT_HASH" "")
-if [[ "$response" == *'"document"'* ]] && [[ "$response" == *'"progress"'* ]]; then
+if [[ "$response" == *'"progress"'* ]] && [[ "$response" == *'"percentage"'* ]]; then
     print_result "PASS" "GET progress retrieval" "$response"
 elif [[ "$response" == *'"message":"Document not found"'* ]]; then
     print_result "WARN" "GET progress retrieval (document not found - expected if no books indexed)" "$response"
