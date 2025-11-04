@@ -94,11 +94,10 @@ class KoreaderController extends Controller {
         if (!$progress) {
             return $this->createKoreaderResponse(['message' => 'Document not found'], 404);
         }
-        
+
         return $this->createKoreaderResponse([
-            'document' => $document,
             'progress' => $progress['progress'] ?? '',
-            'percentage' => $progress['percentage'] ?? '0.0',
+            'percentage' => (float)($progress['percentage'] ?? 0.0),
             'device' => $progress['device'] ?? '',
             'device_id' => $progress['device_id'] ?? ''
         ]);

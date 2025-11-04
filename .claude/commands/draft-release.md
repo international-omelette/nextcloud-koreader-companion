@@ -32,10 +32,10 @@ Create an intelligent draft GitHub release for the KOReader Companion Nextcloud 
 
 5. **Regenerate App Integrity Signature:**
    - **CRITICAL:** Run `./test_scripts/reset_and_deploy.sh` first to ensure container has latest code
-   - Copy certificates to container: `docker cp ~/.nextcloud/certificates/koreader_companion.key nextcloudebooks-app-1:/tmp/ && docker cp ~/.nextcloud/certificates/koreader_companion.crt nextcloudebooks-app-1:/tmp/`
+   - Copy certificates to container: `docker cp certificates/koreader_companion.key koreader-companion-app-1:/tmp/ && docker cp certificates/koreader_companion.crt koreader-companion-app-1:/tmp/`
    - Fix permissions: `docker compose exec app chown www-data:www-data /tmp/koreader_companion.key /tmp/koreader_companion.crt`
    - Sign the app: `docker compose exec -u www-data app php occ integrity:sign-app --path=/var/www/html/apps/koreader_companion --privateKey=/tmp/koreader_companion.key --certificate=/tmp/koreader_companion.crt`
-   - Copy signature back: `docker cp nextcloudebooks-app-1:/var/www/html/apps/koreader_companion/appinfo/signature.json ./appinfo/`
+   - Copy signature back: `docker cp koreader-companion-app-1:/var/www/html/apps/koreader_companion/appinfo/signature.json ./appinfo/`
 
 6. **Commit All Changes:**
    - Bundle all changes (info.xml, CHANGELOG.md, signature.json) in a single chore commit
