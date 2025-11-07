@@ -581,7 +581,7 @@ class KoreaderController extends Controller {
      */
     private function createKoreaderResponse(array $data, int $statusCode = 200): JSONResponse {
         $response = new JSONResponse($data, $statusCode);
-        $response->addHeader('Content-Type', 'application/vnd.koreader.v1+json; charset=utf-8');
+        $response->addHeader('Content-Type', 'application/json');
         return $response;
     }
 
