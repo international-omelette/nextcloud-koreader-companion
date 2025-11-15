@@ -12,6 +12,7 @@ use OCP\IRequest;
 use OCP\IConfig;
 use OCP\IUserSession;
 use OCP\IUserManager;
+use OCP\Security\Bruteforce\IThrottler;
 
 class OpdsController extends Controller {
 
@@ -19,50 +20,51 @@ class OpdsController extends Controller {
     private $config;
     private $userSession;
     private $userManager;
+    private $throttler;
 
-    public function __construct(IRequest $request, $appName, BookService $bookService, IConfig $config, IUserSession $userSession, IUserManager $userManager) {
+    public function __construct(IRequest $request, $appName, BookService $bookService, IConfig $config, IUserSession $userSession, IUserManager $userManager, IThrottler $throttler) {
         parent::__construct($appName, $request);
         $this->bookService = $bookService;
         $this->config = $config;
         $this->userSession = $userSession;
         $this->userManager = $userManager;
+        $this->throttler = $throttler;
     }
 
     /**
      * Authenticate user using HTTP Basic Auth
+     * Supports both regular passwords and app password tokens
      * @return bool True if authenticated, false otherwise
      */
     private function authenticateBasicAuth(): bool {
         $authHeader = $this->request->getHeader('Authorization');
-        
+
         if (!$authHeader || !str_starts_with($authHeader, 'Basic ')) {
             return false;
         }
-        
+
         $credentials = base64_decode(substr($authHeader, 6));
         $parts = explode(':', $credentials, 2);
-        
+
         if (count($parts) !== 2) {
             return false;
         }
-        
+
         [$username, $password] = $parts;
-        
-        // Check if user exists in Nextcloud
-        $user = $this->userManager->get($username);
-        if (!$user) {
+
+        try {
+            // Use logClientIn() which handles app passwords, LDAP, 2FA, and throttling
+            return $this->userSession->logClientIn(
+                $username,
+                $password,
+                $this->request,
+                $this->throttler
+            );
+        } catch (\OCP\Authentication\Exceptions\PasswordLoginForbiddenException $ex) {
+            return false;
+        } catch (\OC\Security\Throttle\MaxDelayReached $ex) {
             return false;
         }
-        
-        // Verify password using Nextcloud's user manager
-        if (!$this->userManager->checkPassword($username, $password)) {
-            return false;
-        }
-        
-        // Set authenticated user in session for BookService context
-        $this->userSession->setUser($user);
-        
-        return true;
     }
 
     /**
