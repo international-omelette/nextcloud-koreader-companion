@@ -11,7 +11,7 @@ Prioritize substance, clarity, and depth. Challenge all my proposals, designs, a
 **Repo**: https://github.com/international-omelette/nextcloud-koreader-companion
 
 **Core capabilities**:
-- OPDS catalog with HTTP Basic Auth (native NC credentials)
+- OPDS catalog with HTTP Basic Auth (supports app passwords, LDAP, 2FA)
 - KOReader sync (custom password, MD5 headers: `x-auth-user`, `x-auth-key`)
 - Event-driven metadata extraction (EPUB/PDF)
 - Web UI with infinite scroll, modal uploads
@@ -27,7 +27,7 @@ Prioritize substance, clarity, and depth. Challenge all my proposals, designs, a
 ```
 Authentication:
   Web UI  → Nextcloud session
-  OPDS    → HTTP Basic (username:password)
+  OPDS    → HTTP Basic via IUserSession->logClientIn() (app passwords, LDAP, 2FA)
   KOReader→ MD5 header (`x-auth-user` + `x-auth-key`)
 
 Data Flow:
@@ -115,7 +115,7 @@ css/books.css       # Nextcloud-style responsive design
 1. Run OPDS + KOReader test scripts after changes
 2. Address ALL failures before completion
 3. Test with various file types (EPUB, PDF, edge cases)
-4. Verify auth flows with real credentials
+4. Verify auth flows with real credentials, app passwords, and LDAP (if available)
 
 **Common pitfalls**:
 - ❌ Don't use inline event handlers (CSP violation)
@@ -136,7 +136,8 @@ css/books.css       # Nextcloud-style responsive design
 
 **OPDS 1.2**:
 - Content-Type: `application/atom+xml;profile=opds-catalog`
-- Auth: HTTP Basic (NC username/password)
+- Auth: HTTP Basic via `IUserSession->logClientIn()` (supports app passwords, LDAP, 2FA)
+- Pattern: Follows DAV auth implementation (see `apps/dav`)
 - Facets: `/opds/authors`, `/opds/series`, `/opds/genres`, `/opds/languages`
 - Pagination: `?page=N` support
 - Spec: http://opds-spec.org/specs/opds-catalog-1-2/
@@ -197,6 +198,7 @@ return new DataResponse(
 - ❌ Custom user backends (use NC native)
 - ❌ Database password storage (use `oc_preferences`)
 - ❌ Custom auth middleware
+- ❌ IUserManager->checkPassword() for HTTP auth (breaks app passwords/LDAP; use IUserSession->logClientIn())
 
 **Code quality**:
 - ❌ Explanatory comments (make code self-documenting)
