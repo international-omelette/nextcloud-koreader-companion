@@ -64,7 +64,7 @@ class BookService {
             return [];
         }
 
-        if (!$booksFolder->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
+        if ($booksFolder->getType() !== \OCP\Files\FileInfo::TYPE_FOLDER) {
             return [];
         }
 
@@ -197,7 +197,7 @@ class BookService {
                 return;
             }
 
-            if (!$booksFolder->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
+            if ($booksFolder->getType() !== \OCP\Files\FileInfo::TYPE_FOLDER) {
                 return;
             }
 
@@ -256,7 +256,7 @@ class BookService {
         }
     }
 
-    private function ensureFileInDatabase(Node $file, string $userId, array &$existingMetadata = null) {
+    private function ensureFileInDatabase(Node $file, string $userId, ?array &$existingMetadata = null) {
         try {
             $fileId = $file->getId();
             $fileModTime = $file->getMTime();
@@ -330,7 +330,7 @@ class BookService {
                 ])
                 ->executeStatement();
 
-            $metadataId = $this->db->lastInsertId('oc_koreader_metadata');
+            $metadataId = $qb->getLastInsertId();
 
             // Generate and store KOReader document hashes
             $this->createHashMappingsForFile($file, $userId, $metadataId);

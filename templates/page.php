@@ -1,10 +1,16 @@
 <?php
 style('koreader_companion', 'books');
+
+// Nextcloud <= 32 ships jQuery in core; 33+ does not, so bundle our own there.
+if (\OCP\Util::getVersion()[0] >= 33) {
+    script('koreader_companion', 'jquery.min');
+}
 script('koreader_companion', 'koreader');
 script('koreader_companion', 'upload');
 
 /** @var \OCP\IL10N $l */
 /** @var array $_ */
+$userTimezone = $_['user_timezone'] ?? date_default_timezone_get();
 
 ?>
 <div id="app">
@@ -136,7 +142,6 @@ script('koreader_companion', 'upload');
                                                     $progressTooltip = number_format($book['progress']['percentage'], 1) . '% complete on ' . $book['progress']['device'];
                                                     if (!empty($book['progress']['updated_at'])) {
                                                         $utcTime = new DateTime($book['progress']['updated_at'], new DateTimeZone('UTC'));
-                                                        $userTimezone = \OC::$server->getConfig()->getUserValue(\OC::$server->getUserSession()->getUser()->getUID(), 'core', 'timezone', date_default_timezone_get());
                                                         $userTime = clone $utcTime;
                                                         $userTime->setTimezone(new DateTimeZone($userTimezone));
                                                         $progressTooltip .= ' (last sync: ' . $userTime->format('M j, Y H:i') . ')';
@@ -162,7 +167,6 @@ script('koreader_companion', 'upload');
                                             <?php if (isset($book['progress']) && $book['progress'] && !empty($book['progress']['updated_at'])): ?>
                                                 <?php
                                                     $utcTime = new DateTime($book['progress']['updated_at'], new DateTimeZone('UTC'));
-                                                    $userTimezone = \OC::$server->getConfig()->getUserValue(\OC::$server->getUserSession()->getUser()->getUID(), 'core', 'timezone', date_default_timezone_get());
                                                     $userTime = clone $utcTime;
                                                     $userTime->setTimezone(new DateTimeZone($userTimezone));
                                                 ?>

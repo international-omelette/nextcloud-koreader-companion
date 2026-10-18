@@ -453,7 +453,7 @@ class KoreaderController extends Controller {
                 ])
                 ->executeStatement();
 
-            return $this->db->lastInsertId();
+            return $insertQb->getLastInsertId();
 
         } catch (\Exception $e) {
             $this->logger->error('Error getting or creating metadata record', [

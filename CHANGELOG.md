@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-11-16
+
+### Fixed
+- Nextcloud 34 compatibility: replaced removed legacy `\OC::$server` getters (`getConfig`, `getURLGenerator`, `getUserSession`, `getLogger`) with the `\OCP\Server::get()` service container
+- OPDS throttling: catch `\OCP\Security\Bruteforce\MaxDelayReached`; previously it went uncaught and returned a 500
+- Web UI on Nextcloud 33/34, where core no longer ships jQuery globally: the app bundles jQuery 3.7.1 and loads it only on NC 33+ (`koreader.js` depends on it; `upload.js` does not)
+- Database install failure on MySQL (SQLSTATE 42000 / error 1071): removed the two `VARCHAR(4000)` indexes (`koreader_metadata.meta_path_idx`, `koreader_file_tracking.tracking_path_idx`) that exceeded the 3072-byte InnoDB key limit, and removed duplicate indexes
+- New migration `Version0006` drops the obsolete indexes and the dormant `koreader_file_tracking` table on existing installations (Version0005 only dropped it with the default `oc_` prefix)
+- Folder type guard in `BookService` was a no-op due to operator precedence (`!$x === ...`)
+- Use `QueryBuilder::getLastInsertId()` for prefix-safe last-insert id retrieval
+- PHP 8.4 deprecation: explicit nullable type on `BookService::ensureFileInDatabase($existingMetadata)`
+
+### Changed
+- Declared Nextcloud 30-34 compatibility
+
 ## [1.2.4] - 2025-11-15
 
 ### Fixed

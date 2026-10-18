@@ -317,7 +317,7 @@ class SettingsController extends Controller {
             return $count;
         } catch (\Exception $e) {
             $this->db->rollBack();
-            \OC::$server->getLogger()->error('Failed to clear library metadata', [
+            \OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('Failed to clear library metadata', [
                 'user' => $userId,
                 'error' => $e->getMessage()
             ]);

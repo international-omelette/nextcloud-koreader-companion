@@ -183,14 +183,11 @@ class Version0001Date20250829000000 extends SimpleMigrationStep {
             $table->addUniqueIndex(['user_id', 'file_id'], 'meta_unique');
             $table->addIndex(['user_id'], 'meta_user_idx');
             $table->addIndex(['file_id'], 'meta_file_idx');
-            $table->addIndex(['file_path'], 'meta_path_idx');
             $table->addIndex(['binary_hash'], 'meta_bin_hash_idx');
             $table->addIndex(['filename_hash'], 'meta_file_hash_idx');
             
             // Comprehensive performance indexes for OPDS pagination and search
             $table->addIndex(['user_id', 'title'], 'idx_ebooks_pagination');
-            $table->addIndex(['user_id', 'title'], 'idx_ebooks_search_title');
-            $table->addIndex(['user_id', 'author'], 'idx_ebooks_search_author');
             $table->addIndex(['user_id', 'publication_date'], 'idx_ebooks_date');
             $table->addIndex(['user_id', 'series', 'series_index'], 'idx_ebooks_series');
             
@@ -200,8 +197,6 @@ class Version0001Date20250829000000 extends SimpleMigrationStep {
             $table->addIndex(['user_id', 'subject'], 'meta_user_subject_idx');
             $table->addIndex(['user_id', 'file_format'], 'meta_user_format_idx');
             $table->addIndex(['user_id', 'language'], 'meta_user_language_idx');
-            $table->addIndex(['user_id', 'publication_date'], 'meta_user_pubdate_idx');
-            $table->addIndex(['user_id', 'series', 'series_index'], 'meta_series_order_idx');
         }
 
         // Create KOReader sync progress table
@@ -260,57 +255,11 @@ class Version0001Date20250829000000 extends SimpleMigrationStep {
             $table->addIndex(['document_hash'], 'progress_doc_idx');
         }
 
-        // Create file tracking table for upload restrictions and monitoring
-        if (!$schema->hasTable('koreader_file_tracking')) {
-            $table = $schema->createTable('koreader_file_tracking');
-            
-            $table->addColumn('id', Types::INTEGER, [
-                'autoincrement' => true,
-                'notnull' => true,
-                'unsigned' => true,
-            ]);
-            
-            $table->addColumn('user_id', Types::STRING, [
-                'notnull' => true,
-                'length' => 64,
-                'comment' => 'Nextcloud username'
-            ]);
-            
-            $table->addColumn('file_id', Types::INTEGER, [
-                'notnull' => true,
-                'unsigned' => true,
-                'comment' => 'Nextcloud file ID'
-            ]);
-            
-            $table->addColumn('file_path', Types::STRING, [
-                'notnull' => true,
-                'length' => 4000,
-                'comment' => 'Full path to the file'
-            ]);
-            
-            $table->addColumn('upload_method', Types::STRING, [
-                'notnull' => true,
-                'length' => 20,
-                'comment' => 'How file was added: app, external, sync'
-            ]);
-            
-            $table->addColumn('created_at', Types::DATETIME, [
-                'notnull' => true,
-                'comment' => 'When file was first tracked'
-            ]);
-            
-            $table->addColumn('updated_at', Types::DATETIME, [
-                'notnull' => true,
-                'comment' => 'Last update timestamp'
-            ]);
-
-            $table->setPrimaryKey(['id']);
-            $table->addUniqueIndex(['user_id', 'file_id'], 'tracking_unique');
-            $table->addIndex(['user_id'], 'tracking_user_idx');
-            $table->addIndex(['file_id'], 'tracking_file_idx');
-            $table->addIndex(['upload_method'], 'tracking_method_idx');
-            $table->addIndex(['file_path'], 'tracking_path_idx');
-        }
+        // NOTE: koreader_file_tracking is intentionally not created. Its
+        // file_path VARCHAR(4000) index exceeded the InnoDB key limit (3072
+        // bytes) and broke MySQL installs with error 1071. The table only
+        // supported removed upload-restriction features and is dropped again
+        // on upgrade by migration Version0006.
 
         // Create hash mapping table for flexible document lookups
         if (!$schema->hasTable('koreader_hash_mapping')) {

@@ -62,7 +62,7 @@ class OpdsController extends Controller {
             );
         } catch (\OCP\Authentication\Exceptions\PasswordLoginForbiddenException $ex) {
             return false;
-        } catch (\OC\Security\Throttle\MaxDelayReached $ex) {
+        } catch (\OCP\Security\Bruteforce\MaxDelayReached $ex) {
             return false;
         }
     }
@@ -349,17 +349,17 @@ class OpdsController extends Controller {
     }
 
     private function getBaseUrl() {
-        $urlGenerator = \OC::$server->getURLGenerator();
+        $urlGenerator = \OCP\Server::get(\OCP\IURLGenerator::class);
         return $urlGenerator->getAbsoluteURL($urlGenerator->linkToRoute($this->appName . '.opds.index'));
     }
 
     private function getOpenSearchUrl() {
-        $urlGenerator = \OC::$server->getURLGenerator();
+        $urlGenerator = \OCP\Server::get(\OCP\IURLGenerator::class);
         return $urlGenerator->getAbsoluteURL($urlGenerator->linkToRoute($this->appName . '.opds.opensearch'));
     }
 
     private function getSearchUrl() {
-        $urlGenerator = \OC::$server->getURLGenerator();
+        $urlGenerator = \OCP\Server::get(\OCP\IURLGenerator::class);
         return $urlGenerator->getAbsoluteURL($urlGenerator->linkToRoute($this->appName . '.opds.search'));
     }
 
@@ -374,7 +374,7 @@ class OpdsController extends Controller {
         }
         
         if ($page > $totalPages && $totalPages > 0) {
-            $urlGenerator = \OC::$server->getURLGenerator();
+            $urlGenerator = \OCP\Server::get(\OCP\IURLGenerator::class);
             $baseRoute = empty($searchQuery) ? 'koreader_companion.opds.index' : 'koreader_companion.opds.search';
             
             $params = [];

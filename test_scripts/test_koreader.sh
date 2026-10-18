@@ -280,17 +280,18 @@ else
     print_result "WARN" "Request Content-Type strict (requires vnd.koreader.v1+json)" "Status: $status_code"
 fi
 
-# Test response content type compliance - Check server returns KOReader content type
+# Test response content type compliance - the server intentionally returns
+# application/json; the vnd type broke the KOReader client (commit 7b6a2d2 / koreader#13539).
 auth_key=$(echo -n "$KOREADER_PASSWORD" | md5sum | cut -d' ' -f1)
 response_headers=$(curl -s -I \
     -H "x-auth-user: $USERNAME" \
     -H "x-auth-key: $auth_key" \
     "$KOREADER_BASE_URL/sync/healthcheck")
 
-if [[ "$response_headers" == *"application/vnd.koreader.v1+json"* ]]; then
-    print_result "PASS" "Response Content-Type compliance (application/vnd.koreader.v1+json)"
+if [[ "$response_headers" == *"application/json"* ]]; then
+    print_result "PASS" "Response Content-Type compliance (application/json)"
 else
-    print_result "FAIL" "Response Content-Type compliance" "Expected: application/vnd.koreader.v1+json"
+    print_result "FAIL" "Response Content-Type compliance" "Expected: application/json"
     if [[ "$VERBOSE" == true ]]; then
         echo "  Headers: $response_headers"
     fi
@@ -304,10 +305,10 @@ for endpoint in "${endpoints[@]}"; do
         -H "x-auth-key: $(echo -n "$KOREADER_PASSWORD" | md5sum | cut -d' ' -f1)" \
         "$KOREADER_BASE_URL$endpoint" 2>/dev/null || echo "")
     
-    if [[ "$response_headers" == *"application/vnd.koreader.v1+json"* ]]; then
+    if [[ "$response_headers" == *"application/json"* ]]; then
         print_result "PASS" "Content-Type for $endpoint"
     else
-        print_result "FAIL" "Content-Type for $endpoint" "Missing KOReader content type"
+        print_result "FAIL" "Content-Type for $endpoint" "Missing application/json response type"
     fi
 done
 

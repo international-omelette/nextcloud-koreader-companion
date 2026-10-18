@@ -100,6 +100,9 @@ class PageController extends Controller {
         return new TemplateResponse($this->appName, 'page', [
             'books' => $books,
             'user_id' => $user ? $user->getUID() : '',
+            'user_timezone' => $user
+                ? $this->config->getUserValue($user->getUID(), 'core', 'timezone', date_default_timezone_get())
+                : date_default_timezone_get(),
             'connection_info' => [
                 'opds_url' => $opdsUrl,
                 'koreader_sync_url' => $koreaderSyncUrl,
