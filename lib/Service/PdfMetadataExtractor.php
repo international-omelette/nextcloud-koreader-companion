@@ -136,8 +136,10 @@ class PdfMetadataExtractor {
                 return false;
             }
 
-            // Check file size (skip files larger than 100MB for performance)
-            if ($file->getSize() > 100 * 1024 * 1024) {
+            // Check file size. The parser reads the whole file into memory, so
+            // this cap (not streaming) is what bounds peak memory; larger PDFs
+            // fall back to filename metadata.
+            if ($file->getSize() > 20 * 1024 * 1024) {
                 $this->logger->info('PDF file too large for metadata extraction', [
                     'file' => $file->getPath(),
                     'size' => $file->getSize()
@@ -173,7 +175,18 @@ class PdfMetadataExtractor {
      */
     private function createTemporaryFile(Node $file): string {
         $tempFile = tempnam(sys_get_temp_dir(), 'pdf_metadata_');
-        file_put_contents($tempFile, $file->getContent());
+        $source = $file->fopen('r');
+        if ($source === false) {
+            return $tempFile;
+        }
+        $target = fopen($tempFile, 'wb');
+        if ($target === false) {
+            fclose($source);
+            return $tempFile;
+        }
+        stream_copy_to_stream($source, $target);
+        fclose($source);
+        fclose($target);
         return $tempFile;
     }
 

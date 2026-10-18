@@ -1,16 +1,15 @@
 <?php
 namespace OCA\KoreaderCompanion\Controller;
 
-use OCA\KoreaderCompanion\Service\DocumentHashGenerator;
-use OCA\KoreaderCompanion\Service\BookService;
+use OCA\KoreaderCompanion\BackgroundJob\ReconcileUserJob;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\BackgroundJob\IJobList;
 use OCP\IRequest;
 use OCP\IDBConnection;
 use OCP\IUserSession;
 use OCP\IUserManager;
 use OCP\IConfig;
-use OCP\Files\IRootFolder;
 use Psr\Log\LoggerInterface;
 
 class KoreaderController extends Controller {
@@ -19,9 +18,7 @@ class KoreaderController extends Controller {
     private $userSession;
     private $userManager;
     private $config;
-    private $hashGenerator;
-    private $bookService;
-    private $rootFolder;
+    private $jobList;
     private $logger;
 
     public function __construct(
@@ -31,9 +28,7 @@ class KoreaderController extends Controller {
         IUserSession $userSession, 
         IUserManager $userManager, 
         IConfig $config,
-        DocumentHashGenerator $hashGenerator,
-        BookService $bookService,
-        IRootFolder $rootFolder,
+        IJobList $jobList,
         LoggerInterface $logger
     ) {
         parent::__construct($AppName, $request);
@@ -41,9 +36,7 @@ class KoreaderController extends Controller {
         $this->userSession = $userSession;
         $this->userManager = $userManager;
         $this->config = $config;
-        $this->hashGenerator = $hashGenerator;
-        $this->bookService = $bookService;
-        $this->rootFolder = $rootFolder;
+        $this->jobList = $jobList;
         $this->logger = $logger;
     }
 
@@ -79,10 +72,12 @@ class KoreaderController extends Controller {
         // First try to get progress using the document hash directly
         $progress = $this->getDocumentProgress($syncUser['id'], $document);
         
-        // If not found, try to find the document by hash and create mapping
+        // If not found, ask the reconciler to index and return not-found.
+        // KOReader retries, so eventual consistency is acceptable.
         if (!$progress) {
             $bookInfo = $this->findBookByHash($document, $syncUser['id']);
             if (!$bookInfo) {
+                $this->queueReconcileIfNeeded($syncUser['id']);
                 $this->logUnknownDocument($document, $syncUser['id']);
                 return $this->createKoreaderResponse(['message' => 'Document not found'], 404);
             }
@@ -129,16 +124,12 @@ class KoreaderController extends Controller {
             return $this->createKoreaderResponse(['error' => 'Document hash required'], 400);
         }
         
-        // Try to find the document by hash to ensure it exists and create mapping if needed
+        // DB-only lookup; on a miss queue reconciliation (rate-limited).
+        // Progress is still saved for unknown documents for KOReader compat.
         $bookInfo = $this->findBookByHash($document, $syncUser['id']);
         if (!$bookInfo) {
-            // Document not found - try auto-indexing
-            $indexed = $this->tryAutoIndex($document, $syncUser['id']);
-            if (!$indexed) {
-                $this->logUnknownDocument($document, $syncUser['id']);
-                // Still save the progress even if we don't know the document
-                // This maintains compatibility with existing KOReader behavior
-            }
+            $this->queueReconcileIfNeeded($syncUser['id']);
+            $this->logUnknownDocument($document, $syncUser['id']);
         }
         
         $this->saveDocumentProgress($syncUser['id'], $document, $progress, $percentage, $device, $deviceId);
@@ -315,196 +306,27 @@ class KoreaderController extends Controller {
     }
 
     /**
-     * Try to automatically index a document by scanning the user's books
+     * Queue a bounded reconciliation for this user, at most once per 10 minutes.
      *
-     * @param string $documentHash MD5 hash from KOReader
-     * @param string $userId Nextcloud username
-     * @return bool True if successfully indexed, false otherwise
+     * KOReader pushes progress frequently and unknown hashes (books outside the
+     * library) never match, so an unbounded walk on every push is not acceptable.
      */
-    private function tryAutoIndex(string $documentHash, string $userId): bool {
+    private function queueReconcileIfNeeded(string $userId): void {
         try {
-            $this->logger->info('Attempting auto-index for unknown document', [
-                'hash' => $documentHash,
-                'user' => $userId
-            ]);
-
-            // Set user context for BookService
-            $user = $this->userManager->get($userId);
-            if (!$user) {
-                $this->logger->info('Auto-index failed: user not found', ['user' => $userId]);
-                return false;
+            $last = (int)$this->config->getUserValue($userId, 'koreader_companion', 'last_reconcile_queued', '0');
+            if (time() - $last < 600) {
+                return;
             }
 
-            $this->userSession->setUser($user);
-
-            // Get all books for this user
-            $books = $this->bookService->getBooks();
-
-            // Check each book's hashes
-            foreach ($books as $book) {
-                try {
-                    // Get the file node
-                    $userFolder = $this->rootFolder->getUserFolder($userId);
-                    $files = $userFolder->getById($book['id']);
-                    
-                    if (empty($files)) {
-                        continue;
-                    }
-                    
-                    $file = $files[0];
-                    
-                    // Generate both types of hashes
-                    $binaryHash = $this->hashGenerator->generateBinaryHashFromNode($file);
-                    $filenameHash = $this->hashGenerator->generateFilenameHashFromNode($file);
-                    
-                    // Check if either hash matches
-                    if ($binaryHash === $documentHash || $filenameHash === $documentHash) {
-                        $hashType = ($binaryHash === $documentHash) ? 'binary' : 'filename';
-                        
-                        $this->logger->info('Auto-indexing document found match', [
-                            'hash' => $documentHash,
-                            'user' => $userId,
-                            'file' => $file->getName(),
-                            'hash_type' => $hashType
-                        ]);
-
-                        // Check if metadata record exists
-                        $metadataId = $this->getOrCreateMetadataRecord($book, $userId);
-                        if (!$metadataId) {
-                            continue;
-                        }
-
-                        // Create hash mapping
-                        $this->createHashMapping($userId, $documentHash, $hashType, $metadataId);
-                        
-                        return true;
-                    }
-                    
-                } catch (\Exception $e) {
-                    $this->logger->info('Error processing book during auto-index', [
-                        'book_id' => $book['id'],
-                        'error' => $e->getMessage()
-                    ]);
-                    continue;
-                }
+            if (!$this->jobList->has(ReconcileUserJob::class, ['userId' => $userId])) {
+                $this->jobList->add(ReconcileUserJob::class, ['userId' => $userId]);
             }
-
-            $this->logger->info('Auto-index completed: no matching document found', [
-                'hash' => $documentHash,
-                'user' => $userId,
-                'books_checked' => count($books)
+            $this->config->setUserValue($userId, 'koreader_companion', 'last_reconcile_queued', (string)time());
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to queue reconcile job', [
+                'user_id' => $userId,
+                'exception' => $e
             ]);
-
-            return false;
-
-        } catch (\Exception $e) {
-            $this->logger->error('Auto-index failed with exception', [
-                'hash' => $documentHash,
-                'user' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-
-    /**
-     * Get or create metadata record for a book
-     *
-     * @param array $book Book information from BookService
-     * @param string $userId Nextcloud username
-     * @return int|null Metadata record ID, or null on error
-     */
-    private function getOrCreateMetadataRecord(array $book, string $userId): ?int {
-        try {
-            // First try to find existing metadata record
-            $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('id')
-                ->from('koreader_metadata')
-                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($book['id'])))
-                ->executeQuery();
-
-            $row = $result->fetch();
-            $result->closeCursor();
-
-            if ($row) {
-                return (int)$row['id'];
-            }
-
-            // Create new metadata record
-            $insertQb = $this->db->getQueryBuilder();
-            $insertQb->insert('koreader_metadata')
-                ->values([
-                    'user_id' => $insertQb->createNamedParameter($userId),
-                    'file_id' => $insertQb->createNamedParameter($book['id']),
-                    'title' => $insertQb->createNamedParameter($book['title'] ?? ''),
-                    'author' => $insertQb->createNamedParameter($book['author'] ?? ''),
-                    'description' => $insertQb->createNamedParameter($book['description'] ?? ''),
-                    'language' => $insertQb->createNamedParameter($book['language'] ?? ''),
-                    'publisher' => $insertQb->createNamedParameter($book['publisher'] ?? ''),
-                    'publication_date' => $insertQb->createNamedParameter($this->parsePublicationDate($book['publication_date'] ?? '') ?? null),
-                    'subject' => $insertQb->createNamedParameter($book['subject'] ?? ''),
-                    'series' => $insertQb->createNamedParameter($book['series'] ?? ''),
-                    'issue' => $insertQb->createNamedParameter($book['issue'] ?? ''),
-                    'volume' => $insertQb->createNamedParameter($book['volume'] ?? ''),
-                    'tags' => $insertQb->createNamedParameter($book['tags'] ?? ''),
-                    'created_at' => $insertQb->createNamedParameter(date('Y-m-d H:i:s')),
-                    'updated_at' => $insertQb->createNamedParameter(date('Y-m-d H:i:s'))
-                ])
-                ->executeStatement();
-
-            return $insertQb->getLastInsertId();
-
-        } catch (\Exception $e) {
-            $this->logger->error('Error getting or creating metadata record', [
-                'book_id' => $book['id'],
-                'user' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            return null;
-        }
-    }
-
-    /**
-     * Create hash mapping entry
-     *
-     * @param string $userId Nextcloud username
-     * @param string $documentHash Document hash
-     * @param string $hashType Type of hash (binary or filename)
-     * @param int $metadataId Metadata record ID
-     * @return bool True on success, false on failure
-     */
-    private function createHashMapping(string $userId, string $documentHash, string $hashType, int $metadataId): bool {
-        try {
-            $qb = $this->db->getQueryBuilder();
-            $qb->insert('koreader_hash_mapping')
-                ->values([
-                    'user_id' => $qb->createNamedParameter($userId),
-                    'document_hash' => $qb->createNamedParameter($documentHash),
-                    'hash_type' => $qb->createNamedParameter($hashType),
-                    'metadata_id' => $qb->createNamedParameter($metadataId),
-                    'created_at' => $qb->createNamedParameter(date('Y-m-d H:i:s'))
-                ])
-                ->executeStatement();
-
-            $this->logger->info('Created hash mapping entry', [
-                'user' => $userId,
-                'hash' => $documentHash,
-                'hash_type' => $hashType,
-                'metadata_id' => $metadataId
-            ]);
-
-            return true;
-
-        } catch (\Exception $e) {
-            $this->logger->error('Error creating hash mapping', [
-                'user' => $userId,
-                'hash' => $documentHash,
-                'hash_type' => $hashType,
-                'metadata_id' => $metadataId,
-                'error' => $e->getMessage()
-            ]);
-            return false;
         }
     }
 

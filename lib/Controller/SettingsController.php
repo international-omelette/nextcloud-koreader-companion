@@ -1,10 +1,12 @@
 <?php
 namespace OCA\KoreaderCompanion\Controller;
 
+use OCA\KoreaderCompanion\BackgroundJob\ReconcileUserJob;
 use OCA\KoreaderCompanion\Service\BookService;
 use OCA\KoreaderCompanion\Service\FilenameService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\BackgroundJob\IJobList;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -19,8 +21,9 @@ class SettingsController extends Controller {
     private $bookService;
     private $rootFolder;
     private $filenameService;
+    private $jobList;
 
-    public function __construct(IRequest $request, IConfig $config, IUserSession $userSession, IDBConnection $db, BookService $bookService, IRootFolder $rootFolder, FilenameService $filenameService, $appName) {
+    public function __construct(IRequest $request, IConfig $config, IUserSession $userSession, IDBConnection $db, BookService $bookService, IRootFolder $rootFolder, FilenameService $filenameService, IJobList $jobList, $appName) {
         parent::__construct($appName, $request);
         $this->config = $config;
         $this->userSession = $userSession;
@@ -32,6 +35,7 @@ class SettingsController extends Controller {
             throw new \Exception('FilenameService not available - required for filename operations');
         }
         $this->filenameService = $filenameService;
+        $this->jobList = $jobList;
     }
 
     /**
@@ -150,18 +154,13 @@ class SettingsController extends Controller {
         // Initialize progress tracking
         $this->updateBatchRenameProgress($userId, 0, 0, $totalBooks, 'Starting batch rename...');
 
-        // OPTIMIZATION: Sync filesystem metadata ONCE at start of batch operation
-        // This eliminates 50+ redundant filesystem scans
-        $this->bookService->ensureMetadataUpToDate($userId);
-
         $this->updateBatchRenameProgress($userId, 5, 0, $totalBooks, 'Scanning library...');
 
         // Process books in chunks to handle medium libraries efficiently
         $totalPages = ceil($totalBooks / $chunkSize);
 
         for ($page = 1; $page <= $totalPages; $page++) {
-            // Get chunk of books with metadata from database (skip metadata update)
-            $books = $this->bookService->getBooks($page, $chunkSize, 'title', true);
+            $books = $this->bookService->getBooks($page, $chunkSize, 'title');
 
             if (empty($books)) {
                 continue; // Skip if database approach fails for this chunk
@@ -314,6 +313,12 @@ class SettingsController extends Controller {
             // Note: We deliberately do NOT clear koreader_sync_progress to preserve reading progress
 
             $this->db->commit();
+
+            // Metadata was deleted; rebuild it in the background.
+            if (!$this->jobList->has(ReconcileUserJob::class, ['userId' => $userId])) {
+                $this->jobList->add(ReconcileUserJob::class, ['userId' => $userId]);
+            }
+
             return $count;
         } catch (\Exception $e) {
             $this->db->rollBack();

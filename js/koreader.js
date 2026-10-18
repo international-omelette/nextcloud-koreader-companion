@@ -679,6 +679,12 @@ function createBookRow(book) {
         const fileSize = formatFileSize(book.size || 0);
         const bookId = book.id;
 
+        let statusBadge = '';
+        if (book.status === 'failed') {
+            const failedAt = book.failed_at ? `, last tried ${book.failed_at}` : '';
+            statusBadge = `<span class="status-badge status-failed" title="Metadata extraction failed${failedAt}">!</span>`;
+        }
+
         // Build comic info if applicable
         let comicInfo = '';
         if (book.format === 'cbr' && (book.series || book.issue)) {
@@ -700,6 +706,7 @@ function createBookRow(book) {
                 <td class="book-title-cell">
                     <div class="book-title-wrapper">
                         <span class="book-title" title="${escapeHtml(book.title || '')}">${escapeHtml(book.title || '')}</span>
+                        ${statusBadge}
                         ${comicInfo}
                     </div>
                 </td>

@@ -75,18 +75,16 @@ class PageController extends Controller {
                   ($this->request->getHeader('X-Requested-With') === 'XMLHttpRequest');
         
         if ($isAjax) {
-            // For AJAX requests, skip metadata updates (performance optimization)
-            // Metadata is updated on initial page load and file uploads
+            // Request paths never index; background jobs own the metadata cache.
             if (empty($query)) {
-                $books = $this->bookService->getBooks($page, $perPage, 'title', true);
+                $books = $this->bookService->getBooks($page, $perPage, 'title');
             } else {
-                $books = $this->bookService->searchBooks($query, $page, $perPage, true);
+                $books = $this->bookService->searchBooks($query, $page, $perPage);
             }
             return new JSONResponse($books);
         }
 
-        // Initial page load: perform metadata update to ensure fresh data
-        $books = $this->bookService->getBooks($page, $perPage, 'title', false);
+        $books = $this->bookService->getBooks($page, $perPage, 'title');
 
         $baseUrl = $this->urlGenerator->getAbsoluteURL($this->urlGenerator->getWebroot());
         $opdsUrl = $baseUrl . 'apps/koreader_companion/opds';
@@ -548,6 +546,7 @@ class PageController extends Controller {
                 }
                 
                 $updateQb->set('file_path', $updateQb->createNamedParameter($filePath))
+                    ->set('status', $updateQb->createNamedParameter('pending'))
                     ->set('updated_at', $updateQb->createNamedParameter($currentTime));
 
                 $updateQb->executeStatement();
@@ -570,6 +569,8 @@ class PageController extends Controller {
                         'issue' => $insertQb->createNamedParameter($metadata['issue'] ?? null),
                         'volume' => $insertQb->createNamedParameter($metadata['volume'] ?? null),
                         'tags' => $insertQb->createNamedParameter($metadata['tags'] ?? null),
+                        'file_format' => $insertQb->createNamedParameter($metadata['format'] ?? null),
+                        'status' => $insertQb->createNamedParameter('pending'),
                         'created_at' => $insertQb->createNamedParameter($currentTime),
                         'updated_at' => $insertQb->createNamedParameter($currentTime),
                     ]);

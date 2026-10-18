@@ -1858,3 +1858,20 @@ input:focus + .slider {
     color: var(--color-text-lighter);
     text-align: center;
 }
+.status-badge {
+    display: inline-block;
+    width: 1.1em;
+    height: 1.1em;
+    line-height: 1.1em;
+    text-align: center;
+    border-radius: 50%;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 0.35em;
+    vertical-align: middle;
+}
+
+.status-failed {
+    background: var(--color-error, #d32f2f);
+    color: #fff;
+}

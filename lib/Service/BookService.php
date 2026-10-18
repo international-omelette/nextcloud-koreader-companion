@@ -42,47 +42,14 @@ class BookService {
     /**
      * Get paginated books from database with optional sorting
      */
-    public function getBooks($page = null, $perPage = null, $sort = 'title', $skipMetadataUpdate = false) {
-        // If pagination parameters are provided, use database-based pagination
-        if ($page !== null && $perPage !== null) {
-            return $this->getPaginatedBooks($page, $perPage, $sort, $skipMetadataUpdate);
-        }
-        
-        // Otherwise, maintain backward compatibility with file-system scanning
-        $user = $this->userSession->getUser();
-        if (!$user) {
-            return [];
-        }
-
-        $folderName = $this->config->getUserValue($user->getUID(), 'koreader_companion', 'folder', 'eBooks');
-        $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-        
-        try {
-            $booksFolder = $userFolder->get($folderName);
-        } catch (\Exception $e) {
-            // Folder doesn't exist, return empty array
-            return [];
-        }
-
-        if ($booksFolder->getType() !== \OCP\Files\FileInfo::TYPE_FOLDER) {
-            return [];
-        }
-
-        $books = [];
-        $this->scanFolder($booksFolder, $books);
-        
-        // Sort books by title (case-insensitive)
-        usort($books, function($a, $b) {
-            return strcasecmp($a['title'] ?? '', $b['title'] ?? '');
-        });
-        
-        return $books;
+    public function getBooks($page = 1, $perPage = 20, $sort = 'title') {
+        return $this->getPaginatedBooks($page, $perPage, $sort);
     }
 
     /**
      * Get paginated books from database and file system
      */
-    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title', $skipMetadataUpdate = false) {
+    private function getPaginatedBooks($page = 1, $perPage = 20, $sort = 'title') {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -91,11 +58,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // First, ensure metadata is up to date by scanning for new files (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         // Now query database for paginated results
         try {
             $qb = $this->db->getQueryBuilder();
@@ -139,26 +101,20 @@ class BookService {
             $this->logger->error('Failed to get paginated books', [
                 'exception' => $e
             ]);
-            // Fallback to filesystem scanning
-            return $this->getBooks();
+            return [];
         }
     }
 
     /**
      * Get total count of books for pagination
      */
-    public function getTotalBookCount($skipMetadataUpdate = false) {
+    public function getTotalBookCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
         }
 
         $userId = $user->getUID();
-
-        // Ensure metadata is up to date first (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -176,57 +132,307 @@ class BookService {
             $this->logger->error('Failed to get total book count', [
                 'exception' => $e
             ]);
-            // Fallback to counting filesystem results
-            return count($this->getBooks());
+            return 0;
         }
     }
 
 
+    // ====================== BACKGROUND INDEXING ======================
+
+    public const MAX_INDEX_ATTEMPTS = 3;
+    public const RECONCILE_MAX_EXTRACTIONS = 100;
+    public const RECONCILE_MAX_SECONDS = 30;
+
     /**
-     * Ensure metadata database is up to date by scanning filesystem
-     * Optimized to load all metadata in one query instead of per-file queries
+     * Index a single file. Takes an explicit userId so it can run without a
+     * user session (background job / occ command).
+     *
+     * Returns true when metadata extraction actually ran for a changed/new file.
      */
-    public function ensureMetadataUpToDate($userId) {
-        try {
-            $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
-            $userFolder = $this->rootFolder->getUserFolder($userId);
-
+    public function indexFile(int $fileId, string $userId, ?Node $node = null, ?array $preloadedRow = null, ?bool $hasHashes = null): bool {
+        if ($node === null) {
             try {
-                $booksFolder = $userFolder->get($folderName);
+                $files = $this->rootFolder->getUserFolder($userId)->getById($fileId);
             } catch (\Exception $e) {
-                return;
+                return false;
             }
-
-            if ($booksFolder->getType() !== \OCP\Files\FileInfo::TYPE_FOLDER) {
-                return;
+            if (empty($files)) {
+                return false;
             }
+            $node = $files[0];
+        }
 
-            $existingMetadata = $this->loadExistingMetadata($userId);
-
-            $this->syncFolderToDatabase($booksFolder, $userId, $existingMetadata);
-
-            $this->cleanupOrphanedMetadata($userId);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to update metadata', [
+        try {
+            $row = $preloadedRow ?? $this->getMetadataRow($userId, $node->getId());
+            return $this->indexNode($node, $userId, $row, $hasHashes);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to index file', [
+                'file_id' => $fileId,
+                'user_id' => $userId,
                 'exception' => $e
             ]);
+            return false;
         }
+    }
+
+    private function indexNode(Node $file, string $userId, ?array $row, ?bool $hasHashes): bool {
+        $fileMTime = $file->getMTime();
+        $attempts = $row ? (int)$row['attempts'] : 0;
+        $status = $row['status'] ?? null;
+
+        if ($row !== null) {
+            if ($status === 'ok') {
+                $fileChanged = $fileMTime > (new \DateTime($row['updated_at']))->getTimestamp();
+                if (!$fileChanged) {
+                    // Hash-only repair: never re-extract an unchanged file just
+                    // because hash generation failed earlier.
+                    if ($hasHashes === null) {
+                        $hasHashes = $this->hasHashMappings((int)$row['id']);
+                    }
+                    if (!$hasHashes) {
+                        $this->createHashMappingsForFile($file, $userId, (int)$row['id']);
+                    }
+                    return false;
+                }
+                $nextAttempts = 1;
+            } elseif ($status === 'failed') {
+                $failedAt = $row['failed_at'] ? (new \DateTime($row['failed_at']))->getTimestamp() : 0;
+                if ($fileMTime <= $failedAt) {
+                    return false;
+                }
+                $nextAttempts = 1;
+            } elseif ($status === 'processing') {
+                // A file replaced while stuck at the cap must be able to recover.
+                $lastAttempt = (new \DateTime($row['updated_at']))->getTimestamp();
+                if ($fileMTime > $lastAttempt) {
+                    $nextAttempts = 1;
+                } elseif ($attempts >= self::MAX_INDEX_ATTEMPTS) {
+                    $this->markMetadataFailed((int)$row['id']);
+                    return false;
+                } else {
+                    $nextAttempts = $attempts + 1;
+                }
+            } else {
+                // pending: fresh upload, always the first attempt
+                $nextAttempts = 1;
+            }
+        } else {
+            $nextAttempts = 1;
+        }
+
+        // Commit the fatal-safe marker BEFORE extraction. A PHP fatal error
+        // leaves the row in `processing` so the reconciler can retry it.
+        if ($row !== null) {
+            $metadataId = (int)$row['id'];
+            $storedMetadata = $row;
+            $this->setMetadataProcessing($metadataId, $nextAttempts);
+        } else {
+            $metadataId = $this->insertPlaceholder($file, $userId, $nextAttempts);
+            if ($metadataId === null) {
+                // Lost an insert race with another worker; let it finish.
+                $row = $this->getMetadataRow($userId, $file->getId());
+                if ($row === null) {
+                    return false;
+                }
+                return $this->indexNode($file, $userId, $row, null);
+            }
+            $storedMetadata = null;
+        }
+
+        // Hash before extraction: sample-based, never reads the whole file.
+        $this->createHashMappingsForFile($file, $userId, $metadataId);
+
+        try {
+            $metadata = $this->extractMetadata($file, $storedMetadata);
+        } catch (\Throwable $e) {
+            // Leave `processing`; the next run retries until MAX_INDEX_ATTEMPTS.
+            // Count the attempt against the reconcile budget.
+            $this->logger->error('Metadata extraction failed', [
+                'file_id' => $file->getId(),
+                'user_id' => $userId,
+                'exception' => $e
+            ]);
+            return true;
+        }
+
+        $this->storeExtractedMetadata($file, $metadataId, $metadata);
+        return true;
+    }
+
+    /**
+     * Reconcile a user's library with the filesystem.
+     *
+     * Budget is counted in extractions (not visited files) plus wall-clock
+     * seconds, so a large library makes progress across runs. Returns
+     * ['visited','attempted','orphans','complete']; `complete=false` means the
+     * caller should schedule another run.
+     */
+    public function reconcileUser(string $userId, ?int $maxExtractions = null, ?int $maxSeconds = null): array {
+        $stats = ['visited' => 0, 'attempted' => 0, 'orphans' => 0, 'complete' => false];
+
+        $folderName = $this->config->getUserValue($userId, 'koreader_companion', 'folder', 'eBooks');
+        try {
+            $booksFolder = $this->rootFolder->getUserFolder($userId)->get($folderName);
+        } catch (\Exception $e) {
+            $stats['complete'] = true;
+            return $stats;
+        }
+
+        if ($booksFolder->getType() !== \OCP\Files\FileInfo::TYPE_FOLDER) {
+            $stats['complete'] = true;
+            return $stats;
+        }
+
+        $existingMetadata = $this->loadExistingMetadata($userId);
+        $metadataWithHashes = $this->loadMetadataIdsWithHashes($userId);
+        $start = microtime(true);
+
+        foreach ($this->collectEbookFiles($booksFolder) as $file) {
+            if ($maxExtractions !== null && $stats['attempted'] >= $maxExtractions) {
+                return $stats;
+            }
+            if ($maxSeconds !== null && (microtime(true) - $start) >= $maxSeconds) {
+                return $stats;
+            }
+
+            $stats['visited']++;
+            $fileId = $file->getId();
+            $row = $existingMetadata[$fileId] ?? null;
+            $hasHashes = $row !== null ? isset($metadataWithHashes[(int)$row['id']]) : null;
+
+            if ($this->indexFile($fileId, $userId, $file, $row, $hasHashes)) {
+                $stats['attempted']++;
+            }
+        }
+
+        $stats['complete'] = true;
+        $stats['orphans'] = $this->cleanupOrphanedMetadata($userId);
+        return $stats;
+    }
+
+    private function collectEbookFiles(Node $folder): \Generator {
+        foreach ($folder->getDirectoryListing() as $node) {
+            if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
+                yield from $this->collectEbookFiles($node);
+            } else {
+                $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
+                if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
+                    yield $node;
+                }
+            }
+        }
+    }
+
+    private function getMetadataRow(string $userId, int $fileId): ?array {
+        $qb = $this->db->getQueryBuilder();
+        $result = $qb->select('*')
+            ->from('koreader_metadata')
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+            ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId)))
+            ->executeQuery();
+        $row = $result->fetch();
+        $result->closeCursor();
+        return $row ?: null;
+    }
+
+    private function insertPlaceholder(Node $file, string $userId, int $attempts): ?int {
+        $now = date('Y-m-d H:i:s');
+        try {
+            $qb = $this->db->getQueryBuilder();
+            $qb->insert('koreader_metadata')
+                ->values([
+                    'user_id' => $qb->createNamedParameter($userId),
+                    'file_id' => $qb->createNamedParameter($file->getId()),
+                    'file_path' => $qb->createNamedParameter($file->getPath()),
+                    'file_format' => $qb->createNamedParameter(strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION))),
+                    'status' => $qb->createNamedParameter('processing'),
+                    'attempts' => $qb->createNamedParameter($attempts),
+                    'created_at' => $qb->createNamedParameter($now),
+                    'updated_at' => $qb->createNamedParameter($now)
+                ])
+                ->executeStatement();
+            return (int)$qb->getLastInsertId();
+        } catch (\OCP\DB\Exception $e) {
+            if ($e->getReason() !== \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+                $this->logger->error('Failed to insert metadata placeholder', ['exception' => $e]);
+            }
+            return null;
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to insert metadata placeholder', ['exception' => $e]);
+            return null;
+        }
+    }
+
+    private function setMetadataProcessing(int $metadataId, int $attempts): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->update('koreader_metadata')
+            ->set('status', $qb->createNamedParameter('processing'))
+            ->set('attempts', $qb->createNamedParameter($attempts))
+            ->set('failed_at', $qb->createNamedParameter(null))
+            ->set('updated_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
+            ->executeStatement();
+    }
+
+    private function markMetadataFailed(int $metadataId): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->update('koreader_metadata')
+            ->set('status', $qb->createNamedParameter('failed'))
+            ->set('failed_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
+            ->executeStatement();
+    }
+
+    private function storeExtractedMetadata(Node $file, int $metadataId, array $metadata): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->update('koreader_metadata')
+            ->set('file_path', $qb->createNamedParameter($file->getPath()))
+            ->set('title', $qb->createNamedParameter($metadata['title'] ?: null))
+            ->set('author', $qb->createNamedParameter($metadata['author'] ?: null))
+            ->set('description', $qb->createNamedParameter($metadata['description'] ?: null))
+            ->set('publisher', $qb->createNamedParameter($metadata['publisher'] ?: null))
+            ->set('publication_date', $qb->createNamedParameter($metadata['publication_date'] ?: null))
+            ->set('language', $qb->createNamedParameter($metadata['language'] ?: null))
+            ->set('series', $qb->createNamedParameter($metadata['series'] ?: null))
+            ->set('series_index', $qb->createNamedParameter($metadata['issue'] ? floatval($metadata['issue']) : null))
+            ->set('subject', $qb->createNamedParameter($metadata['subject'] ?: null))
+            ->set('tags', $qb->createNamedParameter($metadata['tags'] ?: null))
+            ->set('file_format', $qb->createNamedParameter($metadata['format'] ?: null))
+            ->set('issue', $qb->createNamedParameter($metadata['issue'] ?: null))
+            ->set('volume', $qb->createNamedParameter($metadata['volume'] ?: null))
+            ->set('status', $qb->createNamedParameter('ok'))
+            ->set('failed_at', $qb->createNamedParameter(null))
+            ->set('updated_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
+            ->executeStatement();
+    }
+
+    private function hasHashMappings(int $metadataId): bool {
+        $qb = $this->db->getQueryBuilder();
+        $result = $qb->select($qb->func()->count('*'))
+            ->from('koreader_hash_mapping')
+            ->where($qb->expr()->eq('metadata_id', $qb->createNamedParameter($metadataId)))
+            ->executeQuery();
+        $count = (int)$result->fetchOne();
+        $result->closeCursor();
+        return $count > 0;
     }
 
     private function loadExistingMetadata(string $userId): array {
         try {
             $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('id', 'file_id', 'updated_at')
+            $result = $qb->select(
+                'id', 'file_id', 'updated_at', 'status', 'attempts', 'failed_at',
+                'title', 'author', 'description', 'language', 'publisher', 'publication_date',
+                'subject', 'series', 'issue', 'volume', 'tags'
+            )
                 ->from('koreader_metadata')
                 ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
                 ->executeQuery();
 
             $metadata = [];
             while ($row = $result->fetch()) {
-                $metadata[$row['file_id']] = [
-                    'id' => $row['id'],
-                    'updated_at' => $row['updated_at']
-                ];
+                $metadata[$row['file_id']] = $row;
             }
             $result->closeCursor();
 
@@ -239,145 +445,23 @@ class BookService {
         }
     }
 
-    public function syncFileMetadata(Node $file, string $userId): void {
-        $this->ensureFileInDatabase($file, $userId);
-    }
-
-    private function syncFolderToDatabase(Node $folder, string $userId, array &$existingMetadata) {
-        foreach ($folder->getDirectoryListing() as $node) {
-            if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
-                $this->syncFolderToDatabase($node, $userId, $existingMetadata);
-            } else {
-                $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
-                if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    $this->ensureFileInDatabase($node, $userId, $existingMetadata);
-                }
-            }
-        }
-    }
-
-    private function ensureFileInDatabase(Node $file, string $userId, ?array &$existingMetadata = null) {
+    private function loadMetadataIdsWithHashes(string $userId): array {
         try {
-            $fileId = $file->getId();
-            $fileModTime = $file->getMTime();
-
-            if ($existingMetadata !== null && isset($existingMetadata[$fileId])) {
-                $metadata = $existingMetadata[$fileId];
-                $lastUpdated = new \DateTime($metadata['updated_at']);
-                if ($fileModTime <= $lastUpdated->getTimestamp()) {
-                    return;
-                }
-                $this->updateFileMetadata($file, $userId, $metadata['id']);
-            } elseif ($existingMetadata !== null) {
-                $this->insertFileMetadata($file, $userId);
-            } else {
-                $qb = $this->db->getQueryBuilder();
-                $result = $qb->select('id', 'updated_at')
-                    ->from('koreader_metadata')
-                    ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                    ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($fileId)))
-                    ->executeQuery();
-
-                $existingRow = $result->fetch();
-                $result->closeCursor();
-
-                if ($existingRow) {
-                    $lastUpdated = new \DateTime($existingRow['updated_at']);
-                    if ($fileModTime <= $lastUpdated->getTimestamp()) {
-                        return;
-                    }
-                    $this->updateFileMetadata($file, $userId, $existingRow['id']);
-                } else {
-                    $this->insertFileMetadata($file, $userId);
-                }
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to ensure file in database', [
-                'file_path' => $file->getPath(),
-                'exception' => $e
-            ]);
-        }
-    }
-
-    /**
-     * Insert new file metadata into database
-     */
-    private function insertFileMetadata(Node $file, $userId) {
-        try {
-            $metadata = $this->extractMetadata($file);
-
             $qb = $this->db->getQueryBuilder();
-            $qb->insert('koreader_metadata')
-                ->values([
-                    'user_id' => $qb->createNamedParameter($userId),
-                    'file_id' => $qb->createNamedParameter($file->getId()),
-                    'file_path' => $qb->createNamedParameter($file->getPath()),
-                    'title' => $qb->createNamedParameter($metadata['title']),
-                    'author' => $qb->createNamedParameter($metadata['author']),
-                    'description' => $qb->createNamedParameter($metadata['description']),
-                    'publisher' => $qb->createNamedParameter($metadata['publisher']),
-                    'publication_date' => $qb->createNamedParameter($metadata['publication_date'] ?: null),
-                    'language' => $qb->createNamedParameter($metadata['language']),
-                    'series' => $qb->createNamedParameter($metadata['series']),
-                    'series_index' => $qb->createNamedParameter($metadata['issue'] ? floatval($metadata['issue']) : null),
-                    'subject' => $qb->createNamedParameter($metadata['subject']),
-                    'tags' => $qb->createNamedParameter($metadata['tags']),
-                    'file_format' => $qb->createNamedParameter($metadata['format']),
-                    'issue' => $qb->createNamedParameter($metadata['issue']),
-                    'volume' => $qb->createNamedParameter($metadata['volume']),
-                    'created_at' => $qb->createNamedParameter(date('Y-m-d H:i:s')),
-                    'updated_at' => $qb->createNamedParameter(date('Y-m-d H:i:s'))
-                ])
-                ->executeStatement();
+            $result = $qb->selectDistinct('metadata_id')
+                ->from('koreader_hash_mapping')
+                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+                ->executeQuery();
 
-            $metadataId = $qb->getLastInsertId();
-
-            // Generate and store KOReader document hashes
-            $this->createHashMappingsForFile($file, $userId, $metadataId);
-
+            $ids = [];
+            while ($row = $result->fetch()) {
+                $ids[(int)$row['metadata_id']] = true;
+            }
+            $result->closeCursor();
+            return $ids;
         } catch (\Exception $e) {
-            $this->logger->error('Failed to insert file metadata', [
-                'file_path' => $file->getPath(),
-                'exception' => $e
-            ]);
-        }
-    }
-
-    /**
-     * Update existing file metadata in database
-     */
-    private function updateFileMetadata(Node $file, $userId, $metadataId) {
-        try {
-            $metadata = $this->extractMetadata($file);
-
-            $qb = $this->db->getQueryBuilder();
-            $qb->update('koreader_metadata')
-                ->set('file_path', $qb->createNamedParameter($file->getPath()))
-                ->set('title', $qb->createNamedParameter($metadata['title']))
-                ->set('author', $qb->createNamedParameter($metadata['author']))
-                ->set('description', $qb->createNamedParameter($metadata['description']))
-                ->set('publisher', $qb->createNamedParameter($metadata['publisher']))
-                ->set('publication_date', $qb->createNamedParameter($metadata['publication_date'] ?: null))
-                ->set('language', $qb->createNamedParameter($metadata['language']))
-                ->set('series', $qb->createNamedParameter($metadata['series']))
-                ->set('series_index', $qb->createNamedParameter($metadata['issue'] ? floatval($metadata['issue']) : null))
-                ->set('subject', $qb->createNamedParameter($metadata['subject']))
-                ->set('tags', $qb->createNamedParameter($metadata['tags']))
-                ->set('file_format', $qb->createNamedParameter($metadata['format']))
-                ->set('issue', $qb->createNamedParameter($metadata['issue']))
-                ->set('volume', $qb->createNamedParameter($metadata['volume']))
-                ->set('updated_at', $qb->createNamedParameter(date('Y-m-d H:i:s')))
-                ->where($qb->expr()->eq('id', $qb->createNamedParameter($metadataId)))
-                ->executeStatement();
-
-            // Regenerate KOReader document hashes (file may have changed)
-            $this->createHashMappingsForFile($file, $userId, $metadataId);
-
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to update file metadata', [
-                'file_path' => $file->getPath(),
-                'exception' => $e
-            ]);
+            $this->logger->error('Failed to load metadata ids with hashes', ['exception' => $e]);
+            return [];
         }
     }
 
@@ -417,7 +501,9 @@ class BookService {
                 'series' => $row['series'] ?? '',
                 'issue' => $row['issue'] ?? '',
                 'volume' => $row['volume'] ?? '',
-                'tags' => $row['tags'] ?? ''
+                'tags' => $row['tags'] ?? '',
+                'status' => $row['status'] ?? 'ok',
+                'failed_at' => $row['failed_at'] ?? null
             ];
             
             // Add sync progress if available
@@ -433,20 +519,7 @@ class BookService {
         }
     }
 
-    protected function scanFolder(Node $folder, &$books) {
-        foreach ($folder->getDirectoryListing() as $node) {
-            if ($node->getType() === \OCP\Files\FileInfo::TYPE_FOLDER) {
-                $this->scanFolder($node, $books);
-            } else {
-                $extension = strtolower(pathinfo($node->getName(), PATHINFO_EXTENSION));
-                if (in_array($extension, ['epub', 'pdf', 'cbr', 'mobi'])) {
-                    $books[] = $this->extractMetadata($node);
-                }
-            }
-        }
-    }
-
-    private function extractMetadata(Node $file) {
+    private function extractMetadata(Node $file, ?array $storedMetadata = null): array {
         $extension = strtolower(pathinfo($file->getName(), PATHINFO_EXTENSION));
 
         $metadata = [
@@ -472,39 +545,31 @@ class BookService {
             'tags' => ''
         ];
 
-        // Check for stored metadata first (prioritize user-provided metadata from upload)
-        $storedMetadata = $this->getStoredMetadata($file);
+        // Always parse the file. Retries of a placeholder row must re-parse it.
+        if ($extension === 'epub') {
+            $this->extractEpubMetadata($file, $metadata);
+        } elseif ($extension === 'pdf') {
+            $this->extractPdfMetadata($file, $metadata);
+        } elseif ($extension === 'cbr') {
+            // Only process CBR if Archive class is available
+            if (class_exists('Kiwilan\Archive\Archive')) {
+                $this->extractCbrMetadata($file, $metadata);
+            } else {
+                $metadata['format'] = 'cbr';
+            }
+        } elseif ($extension === 'mobi') {
+            $this->extractMobiMetadata($file, $metadata);
+        }
+
+        // User-edited / stored values take precedence over parsed values.
         if ($storedMetadata) {
-            // Use stored metadata as primary source
             $fieldsToOverride = ['title', 'author', 'description', 'language', 'publisher', 'publication_date', 'subject', 'series', 'issue', 'volume', 'tags'];
             foreach ($fieldsToOverride as $field) {
                 if (!empty($storedMetadata[$field])) {
                     $metadata[$field] = $storedMetadata[$field];
                 }
             }
-        } else {
-            // Extract metadata from file using server-side parsers
-            if ($extension === 'epub') {
-                $this->extractEpubMetadata($file, $metadata);
-            } elseif ($extension === 'pdf') {
-                $this->extractPdfMetadata($file, $metadata);
-            } elseif ($extension === 'cbr') {
-                // Only process CBR if Archive class is available
-                if (class_exists('Kiwilan\Archive\Archive')) {
-                    $this->extractCbrMetadata($file, $metadata);
-                } else {
-                    // Fallback: basic filename metadata for CBR
-                    $filename = pathinfo($file->getName(), PATHINFO_FILENAME);
-                    $metadata['title'] = $filename;
-                    $metadata['format'] = 'cbr';
-                }
-            } elseif ($extension === 'mobi') {
-                $this->extractMobiMetadata($file, $metadata);
-            }
         }
-
-        // Add KOReader sync progress information
-        $this->addSyncProgressToMetadata($file, $metadata);
 
         return $metadata;
     }
@@ -679,44 +744,6 @@ class BookService {
             return $progress ?: null;
         } catch (\Exception $e) {
             $this->logger->error('Failed to get sync progress for hashes', ['exception' => $e]);
-            return null;
-        }
-    }
-
-    /**
-     * Get stored custom metadata from database for a file
-     */
-    private function getStoredMetadata(Node $file): ?array {
-        try {
-            $user = $this->userSession->getUser();
-            if (!$user) {
-                // For API calls, try to extract user from file path
-                $filePath = $file->getPath();
-                if (preg_match('/^\/([^\/]+)\/files\//', $filePath, $matches)) {
-                    $userId = $matches[1];
-                } else {
-                    return null;
-                }
-            } else {
-                $userId = $user->getUID();
-            }
-
-            $qb = $this->db->getQueryBuilder();
-            $result = $qb->select('*')
-                ->from('koreader_metadata')
-                ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
-                ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter($file->getId())))
-                ->executeQuery();
-
-            $storedMetadata = $result->fetch();
-            $result->closeCursor();
-
-            return $storedMetadata ?: null;
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to retrieve stored metadata for file', [
-                'file_path' => $file->getPath(),
-                'exception' => $e
-            ]);
             return null;
         }
     }
@@ -972,37 +999,14 @@ class BookService {
         }
     }
 
-    public function searchBooks($query, $page = null, $perPage = null, $skipMetadataUpdate = false) {
-        // If pagination parameters are provided, use database-based search
-        if ($page !== null && $perPage !== null) {
-            return $this->getPaginatedSearchResults($query, $page, $perPage, $skipMetadataUpdate);
-        }
-        
-        // Otherwise, maintain backward compatibility with in-memory search
-        $allBooks = $this->getBooks();
-        
-        if (empty($query)) {
-            return $allBooks;
-        }
-        
-        $query = strtolower($query);
-        $results = [];
-        
-        foreach ($allBooks as $book) {
-            if (stripos($book['title'], $query) !== false || 
-                stripos($book['author'], $query) !== false ||
-                stripos($book['description'], $query) !== false) {
-                $results[] = $book;
-            }
-        }
-        
-        return $results;
+    public function searchBooks($query, $page = 1, $perPage = 20) {
+        return $this->getPaginatedSearchResults($query, $page, $perPage);
     }
 
     /**
      * Get paginated search results from database
      */
-    private function getPaginatedSearchResults($query, $page = 1, $perPage = 20, $skipMetadataUpdate = false) {
+    private function getPaginatedSearchResults($query, $page = 1, $perPage = 20) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -1011,10 +1015,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         if (empty($query)) {
             return $this->getPaginatedBooks($page, $perPage);
@@ -1054,15 +1054,14 @@ class BookService {
             
         } catch (\Exception $e) {
             $this->logger->error('Failed to get paginated search results', ['exception' => $e]);
-            // Fallback to in-memory search
-            return $this->searchBooks($query);
+            return [];
         }
     }
 
     /**
      * Get total count of search results for pagination
      */
-    public function getSearchResultCount($query, $skipMetadataUpdate = false) {
+    public function getSearchResultCount($query) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -1070,13 +1069,9 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         if (empty($query)) {
-            return $this->getTotalBookCount($skipMetadataUpdate);
+            return $this->getTotalBookCount();
         }
         
         try {
@@ -1100,22 +1095,38 @@ class BookService {
             return $count;
         } catch (\Exception $e) {
             $this->logger->error('Failed to get search result count', ['exception' => $e]);
-            // Fallback to in-memory search count
-            return count($this->searchBooks($query));
+            return 0;
         }
     }
 
 
 
     public function getBookById($id) {
-        $allBooks = $this->getBooks();
-        
-        foreach ($allBooks as $book) {
-            if ($book['id'] == intval($id)) {
-                return $book;
-            }
+        $user = $this->userSession->getUser();
+        if (!$user) {
+            return null;
         }
-        
+
+        try {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select('*')
+               ->from('koreader_metadata')
+               ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($user->getUID())))
+               ->andWhere($qb->expr()->eq('file_id', $qb->createNamedParameter((int)$id)));
+            $result = $qb->executeQuery();
+            $row = $result->fetch();
+            $result->closeCursor();
+
+            if ($row) {
+                return $this->convertDatabaseRowToBookArray($row, $user->getUID());
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to get book by ID', [
+                'id' => $id,
+                'exception' => $e
+            ]);
+        }
+
         return null;
     }
 
@@ -1842,7 +1853,7 @@ class BookService {
     /**
      * Get authors with book counts for faceted browsing
      */
-    public function getAuthors($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
+    public function getAuthors($page = 1, $perPage = 50) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -1851,11 +1862,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select(['author', $qb->func()->count('*', 'book_count')])
@@ -1878,7 +1884,7 @@ class BookService {
     /**
      * Get total count of unique authors
      */
-    public function getAuthorsCount($skipMetadataUpdate = false) {
+    public function getAuthorsCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -1886,10 +1892,6 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -1925,9 +1927,6 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -1999,7 +1998,7 @@ class BookService {
     /**
      * Get series with book counts for faceted browsing
      */
-    public function getSeries($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
+    public function getSeries($page = 1, $perPage = 50) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2008,11 +2007,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select(['series', $qb->func()->count('*', 'book_count')])
@@ -2035,7 +2029,7 @@ class BookService {
     /**
      * Get total count of unique series
      */
-    public function getSeriesCount($skipMetadataUpdate = false) {
+    public function getSeriesCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -2043,10 +2037,6 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2082,9 +2072,6 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2144,7 +2131,7 @@ class BookService {
     /**
      * Get genres/subjects with book counts for faceted browsing
      */
-    public function getGenres($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
+    public function getGenres($page = 1, $perPage = 50) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2153,11 +2140,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select(['subject', $qb->func()->count('*', 'book_count')])
@@ -2180,7 +2162,7 @@ class BookService {
     /**
      * Get total count of unique genres/subjects
      */
-    public function getGenresCount($skipMetadataUpdate = false) {
+    public function getGenresCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -2188,10 +2170,6 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2227,9 +2205,6 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2304,7 +2279,7 @@ class BookService {
     /**
      * Get formats with book counts for faceted browsing
      */
-    public function getFormats($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
+    public function getFormats($page = 1, $perPage = 50) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2313,11 +2288,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select(['file_format', $qb->func()->count('*', 'book_count')])
@@ -2340,7 +2310,7 @@ class BookService {
     /**
      * Get total count of unique formats
      */
-    public function getFormatsCount($skipMetadataUpdate = false) {
+    public function getFormatsCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -2348,10 +2318,6 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2387,9 +2353,6 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
         
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2464,7 +2427,7 @@ class BookService {
     /**
      * Get languages with book counts for faceted browsing
      */
-    public function getLanguages($page = 1, $perPage = 50, $skipMetadataUpdate = false) {
+    public function getLanguages($page = 1, $perPage = 50) {
         $user = $this->userSession->getUser();
         if (!$user) {
             return [];
@@ -2473,11 +2436,6 @@ class BookService {
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
-        
         try {
             $qb = $this->db->getQueryBuilder();
             $qb->select(['language', $qb->func()->count('*', 'book_count')])
@@ -2500,7 +2458,7 @@ class BookService {
     /**
      * Get total count of unique languages
      */
-    public function getLanguagesCount($skipMetadataUpdate = false) {
+    public function getLanguagesCount() {
         $user = $this->userSession->getUser();
         if (!$user) {
             return 0;
@@ -2508,10 +2466,6 @@ class BookService {
 
         $userId = $user->getUID();
 
-        // Ensure metadata is up to date (unless skipped)
-        if (!$skipMetadataUpdate) {
-            $this->ensureMetadataUpToDate($userId);
-        }
 
         try {
             $qb = $this->db->getQueryBuilder();
@@ -2547,9 +2501,6 @@ class BookService {
 
         $userId = $user->getUID();
         $offset = ($page - 1) * $perPage;
-        
-        // Ensure metadata is up to date
-        $this->ensureMetadataUpToDate($userId);
         
         try {
             $qb = $this->db->getQueryBuilder();
