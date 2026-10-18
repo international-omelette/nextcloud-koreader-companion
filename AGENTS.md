@@ -6,20 +6,20 @@ Prioritize substance, clarity, and depth. Challenge all my proposals, designs, a
 ## Overview
 
 **What**: Nextcloud app providing OPDS 1.2 library + KOReader sync API
-**Stack**: PHP 8.1+, Nextcloud 30-34, native NC APIs (IRootFolder, IConfig, IUserSession)
-**Version**: 1.2.5 (Nov 2025)
+**Stack**: PHP 8.1+ (floor set by NC 30; NC 34 needs 8.2+; composer.json declares >=8.0), Nextcloud 30-34, native NC APIs (IRootFolder, IConfig, IUserSession)
+**Version**: 1.3.0 (Oct 2026)
 **Repo**: https://github.com/international-omelette/nextcloud-koreader-companion
 
 **Core capabilities**:
 - OPDS catalog with HTTP Basic Auth (supports app passwords, LDAP, 2FA)
 - KOReader sync (custom password, MD5 headers: `x-auth-user`, `x-auth-key`)
-- Event-driven metadata extraction (EPUB/PDF)
+- Background-job metadata extraction (EPUB/PDF), queued from file events
 - Web UI with infinite scroll, modal uploads
 - Privacy-first: zero external dependencies
 
-**Architecture shift (v1.0 → v1.2)**:
+**Architecture shift (v1.0 → v1.3)**:
 - Path-based → ID-based file operations
-- Background indexing → Real-time event-driven processing
+- Inline extraction in requests/listeners → event-queued background jobs (v1.3); request paths are DB-only
 - Admin settings → User-level configuration
 
 ### System Design
@@ -31,14 +31,29 @@ Authentication:
   KOReader→ MD5 header (`x-auth-user` + `x-auth-key`)
 
 Data Flow:
-  File Upload → FileCreationListener → BookService.extractMetadata()
-             → Store in oc_koreader_metadata (key: file_id)
+  File Upload → FileCreationListener → queue IndexFileJob {fileId,userId}
+  IndexFileJob → BookService.indexFile()
+             → write status marker (processing, attempts++) BEFORE extraction
+             → extract → oc_koreader_metadata (key: file_id, status ok|failed)
              → Generate hashes → Store in oc_koreader_hash_mapping
+  No Node event (files:scan, upgrades, cleared library):
+    ReconcileLibraryJob (hourly TimedJob, callForSeenUsers) → queue ReconcileUserJob
+    ReconcileUserJob → BookService.reconcileUser() (bounded; re-queues itself until done)
+    occ koreader:index [user] → unbounded reconcileUser()
+  Web / OPDS (incl. download, thumbnail) / sync / batch rename → DB-only, no FS scan
   OPDS Request → OpdsController → BookService.getBooks() → XML feed
-  Sync Request → KoreaderController → Hash validation → oc_koreader_progress
+  Sync Request → KoreaderController → Hash validation → oc_koreader_sync_progress
+             → hash miss: queue ReconcileUserJob (max once/600s/user; no inline indexing)
+
+Indexing status (oc_koreader_metadata, migration Version0007):
+  status pending|processing|ok|failed, attempts, failed_at
+  Marker written before extraction → fatal errors (OOM) leave `processing`
+  processing with attempts >= 3 → failed (not retried)
+  Newer file mtime → attempts reset (re-indexed)
+  PDF extraction skipped above 20 MB
 
 Core Services:
-  BookService            - Metadata extraction, pagination, real-time scanning
+  BookService            - indexFile()/reconcileUser(), metadata extraction, DB-only queries + pagination
   PdfMetadataExtractor   - PDF-specific parsing (smalot/pdfparser)
   DocumentHashGenerator  - KOReader hash generation
   FilenameService        - Batch rename operations
@@ -57,8 +72,15 @@ lib/
 │   ├── PdfMetadataExtractor.php # Enhanced PDF support
 │   ├── FilenameService.php      # Batch operations
 │   └── DocumentHashGenerator.php# KOReader hashing
+├── BackgroundJob/
+│   ├── IndexFileJob.php         # Index one file {fileId,userId}
+│   ├── ReconcileUserJob.php     # Bounded per-user reconcile, re-queues itself
+│   └── ReconcileLibraryJob.php  # Hourly: queue ReconcileUserJob per seen user
+├── Command/
+│   ├── IndexLibraryCommand.php  # occ koreader:index [user]
+│   └── GenerateBookHashesCommand.php
 ├── Listener/
-│   ├── FileCreationListener.php # Real-time metadata extraction
+│   ├── FileCreationListener.php # Queues IndexFileJob
 │   └── FileDeleteListener.php   # Cleanup orphaned records
 └── Migration/                   # Database schema (oc_koreader_*)
 
@@ -75,10 +97,12 @@ css/books.css       # Nextcloud-style responsive design
 ./test_scripts/reset_and_deploy.sh       # Deploy to dev container
 ./test_scripts/test_opds.sh -v           # OPDS + Basic Auth validation
 ./test_scripts/test_koreader.sh -v       # KOReader sync compliance
+./test_scripts/test_indexing.sh --root <env> --base-url <url>  # Background indexing guarantees
 ```
 
 **Key files**:
-- `BookService.php:38` - Pagination logic
+- `BookService::getBooks()` - Pagination logic
+- `BookService::indexFile()` / `reconcileUser()` - Indexing + status tracking
 - `OpdsController.php` - OPDS feed generation
 - `KoreaderController.php:updateProgress()` - Sync endpoint
 - `routes.php` - All API paths
@@ -106,6 +130,7 @@ Docker is unavailable.
 ./test_scripts/bootstrap_test_env.sh                    # PHP + MariaDB + NC34 + app
 ./test_scripts/test_opds.sh     --base-url "http://127.0.0.1:8090/index.php"
 ./test_scripts/test_koreader.sh --base-url "http://127.0.0.1:8090/index.php"
+./test_scripts/test_indexing.sh --root "$KOREADER_TESTENV" --base-url "http://127.0.0.1:8090/index.php"
 ./test_scripts/teardown_test_env.sh                     # stop the stack (keeps files)
 ./test_scripts/teardown_test_env.sh --wipe              # stop and delete $KOREADER_TESTENV
 ```
@@ -115,7 +140,7 @@ What the script provisions (all under `$KOREADER_TESTENV`, default `~/.koreader-
 - MariaDB 10.11 binary tarball, initialized and started in user space
 - Nextcloud 34 tarball, installed against that database
 - Composer dependencies installed into a throwaway copy of the app
-- The app deployed, enabled, a test EPUB seeded, KOReader password set to `test123`
+- The app deployed, enabled, a test EPUB seeded and indexed via `occ koreader:index`, KOReader password set to `test123`
 - A `php -S`-served Nextcloud on `127.0.0.1:8090` (admin / admin)
 
 Notes / gotchas:
@@ -133,6 +158,12 @@ Notes / gotchas:
   on the host (the script warns if they are missing); MariaDB bundles its own.
 - Nextcloud 34 needs PHP 8.2-8.4; the static PHP 8.4 build works. Older NC (30/31)
   may reject PHP 8.4 and would need a PHP 8.3 static build instead.
+- `test_indexing.sh` drives the DB via `test_scripts/db_exec.php`, which reads
+  the env's `config.php` (works on MariaDB and SQLite).
+- Files added via `occ files:scan` fire no Node events, so they are not indexed
+  until `occ koreader:index` or cron (ReconcileLibraryJob) runs.
+- Repeated OPDS runs accumulate Nextcloud bruteforce throttling from the
+  intentional bad-auth tests; reset with `occ security:bruteforce:reset 127.0.0.1`.
 - `/tmp` is often wiped; keep `KOREADER_TESTENV` somewhere persistent.
 
 ## Development Context
@@ -212,7 +243,7 @@ return new DataResponse(
 - Cache metadata in `oc_koreader_metadata`
 - Paginate large result sets
 - Index database queries properly
-- Event-driven updates (no polling)
+- Event-queued background jobs (no polling, no filesystem work in request paths)
 
 ## Agent Workflow
 
@@ -264,4 +295,4 @@ Before implementing, ask:
 If any answer is "no" or "uncertain", propose alternatives.
 
 ---
-*Last Updated: 2025-10-18 | v1.2.5*
+*Last Updated: 2026-10-18 | v1.3.0*
