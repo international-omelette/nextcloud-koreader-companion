@@ -11,6 +11,7 @@ KOREADER_BASE_URL="$BASE_URL/apps/koreader_companion"
 USERNAME="admin"
 KOREADER_PASSWORD="test123"
 VERBOSE=false
+INDEX_CMD=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             KOREADER_PASSWORD="$2"
             shift 2
             ;;
+        --index-cmd)
+            INDEX_CMD="$2"
+            shift 2
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
@@ -46,6 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --base-url URL    Set base URL (default: http://localhost:8080)"
             echo "  --username USER   Set username (default: admin)"
             echo "  --password PASS   Set KOReader password (default: test)"
+            echo "  --index-cmd CMD   Run this command before testing (e.g. occ koreader:index)"
             echo "  -h, --help        Show this help"
             exit 0
             ;;
@@ -160,6 +166,11 @@ print_status "$BLUE" "KOReader Sync API Test Suite"
 print_status "$BLUE" "Testing against: $KOREADER_BASE_URL"
 print_status "$BLUE" "Username: $USERNAME"
 echo
+
+if [[ -n "$INDEX_CMD" ]]; then
+    print_status "$BLUE" "Running index command: $INDEX_CMD"
+    eval "$INDEX_CMD" || print_result "WARN" "Index command failed" "$INDEX_CMD"
+fi
 
 # Test 1: Health Check
 print_section "Health Check"
@@ -326,8 +337,8 @@ fi
 echo
 print_status "$BLUE" "Testing complete!"
 print_status "$YELLOW" "Next steps:"
-echo "1. Ensure books are indexed with hashes using: php occ ebooks:generate-hashes"
+echo "1. Ensure books are indexed using: php occ koreader:index"
 echo "2. Test with real KOReader device using server: $KOREADER_BASE_URL"
-echo "3. Check web UI at: $BASE_URL/apps/ebooks_poc/"
+echo "3. Check web UI at: $BASE_URL/apps/koreader_companion/"
 echo "4. Monitor logs for any issues: docker logs <container-id>"
 echo

@@ -358,9 +358,8 @@ seed() {
       $z->close();
     ' "$book"
     "$PHP_BIN" "$NC_DIR/occ" files:scan "$ADMIN_USER" >/dev/null 2>&1 || true
-    # First page load triggers metadata indexing
-    curl -s -o /dev/null -u "$ADMIN_USER:$ADMIN_PASS" \
-      "http://127.0.0.1:$HTTP_PORT/index.php/apps/koreader_companion/" || true
+    # Indexing is event/occ driven; no request path indexes the library.
+    "$PHP_BIN" "$NC_DIR/occ" koreader:index "$ADMIN_USER"
   fi
 }
 

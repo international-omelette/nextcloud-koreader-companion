@@ -131,6 +131,10 @@ docker exec -u www-data "$CONTAINER_ID" bash -lc "php occ cache:clear 2>/dev/nul
 # Clear webserver opcache by restarting PHP-FPM (best-effort)
 docker exec -u root "$CONTAINER_ID" bash -lc "(service php8.3-fpm restart 2>/dev/null || service php8.2-fpm restart 2>/dev/null || service php8.1-fpm restart 2>/dev/null || true) || true"
 
+# 12d) Index the KOReader library (events are async; seed/populate via occ)
+log "Indexing the KOReader library"
+docker exec -u www-data "$CONTAINER_ID" php occ koreader:index || docker exec -u root "$CONTAINER_ID" bash -lc "php occ koreader:index || true"
+
 # 13) Clear bruteforce attempts to allow testing
 log "Clearing bruteforce attempts for API testing"
 # Get DB container

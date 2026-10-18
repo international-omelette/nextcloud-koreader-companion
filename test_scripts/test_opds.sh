@@ -11,6 +11,7 @@ OPDS_BASE_URL="$BASE_URL/apps/koreader_companion/opds"
 USERNAME="admin"
 PASSWORD="admin"
 VERBOSE=false
+INDEX_CMD=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             PASSWORD="$2"
             shift 2
             ;;
+        --index-cmd)
+            INDEX_CMD="$2"
+            shift 2
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
@@ -46,6 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --base-url URL    Set base URL (default: http://localhost:8080)"
             echo "  --username USER   Set username (default: admin)"
             echo "  --password PASS   Set password (default: admin)"
+            echo "  --index-cmd CMD   Run this command before testing (e.g. occ koreader:index)"
             echo "  -h, --help        Show this help"
             exit 0
             ;;
@@ -165,6 +171,11 @@ print_status "$BLUE" "OPDS API Test Suite"
 print_status "$BLUE" "Testing against: $OPDS_BASE_URL"
 print_status "$BLUE" "Username: $USERNAME"
 echo
+
+if [[ -n "$INDEX_CMD" ]]; then
+    print_status "$BLUE" "Running index command: $INDEX_CMD"
+    eval "$INDEX_CMD" || print_result "WARN" "Index command failed" "$INDEX_CMD"
+fi
 
 # Test 1: Authentication Tests
 print_section "Authentication Tests"
