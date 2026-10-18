@@ -1,7 +1,7 @@
-# Update Claude.md File
+# Update AGENTS.md File
 
-## Current Claude.md State
-@CLAUDE.md
+## Current AGENTS.md State
+@AGENTS.md
 
 ## Git Analysis
 
@@ -43,7 +43,7 @@
 
 ## Your Task
 
-Based on the current CLAUDE.md content and all the git analysis above, create an updated CLAUDE.md file that:
+Based on the current AGENTS.md content and all the git analysis above, create an updated AGENTS.md file that:
 
 ## 1. Preserves Important Existing Content
 - Keep the core project description and architecture
@@ -62,7 +62,7 @@ Analyze the git diff and logs to identify:
 - **Refactoring**: Significant code reorganization or architectural changes
 
 ## 3. Updates Key Sections
-Intelligently update these CLAUDE.md sections:
+Intelligently update these AGENTS.md sections:
 
 ### Project Overview
 - Update description if scope changed
@@ -105,11 +105,11 @@ Add a "Recent Updates" section with:
 - **Don't duplicate**: Avoid repeating information already well-documented
 - **Prioritize relevance**: Focus on changes that affect how developers work with the code
 - **Keep it concise**: Summarize rather than listing every small change
-- **Maintain structure**: Follow existing CLAUDE.md organization
+- **Maintain structure**: Follow existing AGENTS.md organization
 - **Add timestamps**: Note when major updates were made
 
 ## 5. Output Format
-Provide the complete updated CLAUDE.md content, organized as:
+Provide the complete updated AGENTS.md content, organized as:
 
 ```markdown
 # Project Name

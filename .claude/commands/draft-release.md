@@ -39,7 +39,7 @@ Create an intelligent draft GitHub release for the KOReader Companion Nextcloud 
 
 6. **Commit All Changes:**
    - Bundle all changes (info.xml, CHANGELOG.md, signature.json) in a single chore commit
-   - Add all infrastructure changes to this commit (like updated to @CLAUDE.md etc.)
+   - Add all infrastructure changes to this commit (like updated to @AGENTS.md etc.)
    - Commit message: "chore: prepare release vX.Y.Z"
    - Push changes to remote
 

@@ -6,8 +6,8 @@ Prioritize substance, clarity, and depth. Challenge all my proposals, designs, a
 ## Overview
 
 **What**: Nextcloud app providing OPDS 1.2 library + KOReader sync API
-**Stack**: PHP 8.0+, Nextcloud 30-31, native NC APIs (IRootFolder, IConfig, IUserSession)
-**Version**: 1.2.0 (Oct 2025)
+**Stack**: PHP 8.1+, Nextcloud 30-34, native NC APIs (IRootFolder, IConfig, IUserSession)
+**Version**: 1.2.5 (Nov 2025)
 **Repo**: https://github.com/international-omelette/nextcloud-koreader-companion
 
 **Core capabilities**:
@@ -87,13 +87,53 @@ css/books.css       # Nextcloud-style responsive design
 **Database**:
 - `oc_koreader_metadata` - Metadata cache (file_id primary key)
 - `oc_koreader_hash_mapping` - Document hash mappings (auto-generated on upload)
-- `oc_koreader_progress` - Reading positions
+- `oc_koreader_sync_progress` - Reading positions
 - `oc_preferences` - User settings (folder, password)
 
 **Critical paths**:
 - OPDS feed: `https://nc.example.com/apps/koreader_companion/opds`
 - Sync API: `https://nc.example.com/apps/koreader_companion/sync/*`
 - Signing certs: `~/.nextcloud/certificates/`
+
+## Local Test Environment (no Docker / no root)
+
+This project can be tested end-to-end without Docker or root by running a
+self-contained Nextcloud + database stack entirely in user space. Use this when
+Docker is unavailable.
+
+**Bootstrap**:
+```bash
+./test_scripts/bootstrap_test_env.sh                    # PHP + MariaDB + NC34 + app
+./test_scripts/test_opds.sh     --base-url "http://127.0.0.1:8090/index.php"
+./test_scripts/test_koreader.sh --base-url "http://127.0.0.1:8090/index.php"
+./test_scripts/teardown_test_env.sh                     # stop the stack (keeps files)
+./test_scripts/teardown_test_env.sh --wipe              # stop and delete $KOREADER_TESTENV
+```
+
+What the script provisions (all under `$KOREADER_TESTENV`, default `~/.koreader-testenv`):
+- Static PHP 8.4 binary from https://dl.static-php.dev (no system packages installed)
+- MariaDB 10.11 binary tarball, initialized and started in user space
+- Nextcloud 34 tarball, installed against that database
+- Composer dependencies installed into a throwaway copy of the app
+- The app deployed, enabled, a test EPUB seeded, KOReader password set to `test123`
+- A `php -S`-served Nextcloud on `127.0.0.1:8090` (admin / admin)
+
+Notes / gotchas:
+- The built-in PHP server requires `/index.php/...` in URLs. Pass
+  `--base-url "http://127.0.0.1:8090/index.php"` to the test scripts.
+- KOReader sync stores `md5(password)` in `oc_preferences` under
+  `koreader_companion/koreader_sync_password`, **not the plaintext**. To set it
+  manually: `occ user:setting admin koreader_companion koreader_sync_password "$(printf test123 | md5sum | cut -d' ' -f1)"`.
+- **MariaDB silently adapts oversized indexes** (prefixes long non-unique keys,
+  e.g. `(768)`; converts long unique keys to `USING HASH`); MySQL instead rejects
+  them. The `1071 Specified key was too long` failure in issue #9 is therefore
+  **MySQL-specific** — reproduce with MySQL 8.0 (`bootstrap_test_env.sh --db mysql`),
+  which is what the Nextcloud snap ships per issue #9. MySQL also needs
+  `libaio1`/`libnuma1`
+  on the host (the script warns if they are missing); MariaDB bundles its own.
+- Nextcloud 34 needs PHP 8.2-8.4; the static PHP 8.4 build works. Older NC (30/31)
+  may reject PHP 8.4 and would need a PHP 8.3 static build instead.
+- `/tmp` is often wiped; keep `KOREADER_TESTENV` somewhere persistent.
 
 ## Development Context
 
@@ -143,7 +183,7 @@ css/books.css       # Nextcloud-style responsive design
 - Spec: http://opds-spec.org/specs/opds-catalog-1-2/
 
 **KOReader Sync**:
-- Content-Type: `application/vnd.koreader.v1+json`
+- Response Content-Type: `application/json` (deliberate; `application/vnd.koreader.v1+json` broke the KOReader client — see commit 7b6a2d2 / koreader#13539)
 - Auth: MD5(`username` + `password`) in `x-auth-key` header
 - Endpoints: `/sync/users/auth`, `/sync/syncs/progress`, `/sync/healthcheck`
 - Document hash: MD5 of file content
@@ -169,7 +209,7 @@ return new DataResponse(
 - Memory (5000 books): <100MB
 
 **Optimization strategies**:
-- Cache metadata in `oc_koreader_books`
+- Cache metadata in `oc_koreader_metadata`
 - Paginate large result sets
 - Index database queries properly
 - Event-driven updates (no polling)
@@ -224,4 +264,4 @@ Before implementing, ask:
 If any answer is "no" or "uncertain", propose alternatives.
 
 ---
-*Last Updated: 2025-10-03 | v1.2.0*
+*Last Updated: 2025-10-18 | v1.2.5*
