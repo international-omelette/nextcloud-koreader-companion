@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.5] - 2025-11-16
+## [1.3.0] - 2026-10-19
+
+### Added
+- Background indexing: file events queue an `IndexFileJob`; an hourly reconciler indexes files that arrive without events (`occ files:scan`, external storage, upgrades) in bounded batches
+- `occ koreader:index [user]` command to index or rebuild a library on demand
+- Indexing status per book (`pending`, `processing`, `ok`, `failed`); the web UI marks books whose metadata could not be extracted
+- Migration `Version0007` adds `status`, `attempts` and `failed_at` to `koreader_metadata`
+
+### Changed
+- Web UI, OPDS (including download and thumbnail), KOReader sync and batch rename only read from the database; no request scans the library or parses files
+- KOReader sync no longer scans the library for unknown documents; it queues a reconcile at most once per 10 minutes per user
+- Clearing the library or changing the folder rebuilds the metadata in the background
+- PDF metadata extraction is skipped above 20 MB (previously 100 MB); larger files use filename metadata
+
+### Fixed
+- A malformed PDF that exhausted PHP memory could lock a user out of the app on every page load (#2). Files that fail 3 times are now marked `failed` and skipped until they change
+
+## [1.2.5] - 2025-11-16 (unreleased)
 
 ### Fixed
 - Nextcloud 34 compatibility: replaced removed legacy `\OC::$server` getters (`getConfig`, `getURLGenerator`, `getUserSession`, `getLogger`) with the `\OCP\Server::get()` service container
